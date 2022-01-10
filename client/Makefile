@@ -78,6 +78,12 @@ JANSSONLIBINC = -I$(JANSSONLIBPATH)
 JANSSONLIB = $(JANSSONLIBPATH)/libjansson.a
 JANSSONLIBLD =
 
+## Linenoise-ng
+LINENOISELIBPATH = ./deps/linenoise-ng
+LINENOISELIBINC = -I$(LINENOISELIBPATH)
+LINENOISELIB = $(LINENOISELIBPATH)/liblinenoise.a
+LINENOISELIBLD =
+
 ## Lua
 LUALIBPATH = ./deps/liblua
 LUALIBINC = -I$(LUALIBPATH)
@@ -145,6 +151,9 @@ PM3INCLUDES += $(CLIPARSERLIBINC)
 STATICLIBS += $(HARDNESTEDLIB)
 LDLIBS +=$(HARDNESTEDLIBLD)
 PM3INCLUDES += $(HARDNESTEDLIBINC)
+
+## Linenoise-ng
+# wait to see if Readline is available
 
 ## Lua
 ifneq ($(SKIPLUASYSTEM),1)
@@ -325,6 +334,13 @@ ifneq ($(SKIPREADLINE),1)
 
     LDLIBS += -lreadline
     READLINE_FOUND = 1
+else
+## Linenoise
+    ifneq ($(SKIPLINENOISE),1)
+        STATICLIBS += $(LINENOISELIB)
+        LDLIBS += $(LINENOISELIBLD)
+        PM3INCLUDES += $(LINENOISELIBINC)
+    endif
 endif
 
 ########
@@ -360,6 +376,8 @@ endif
 
 ifeq ($(READLINE_FOUND),1)
     PM3CFLAGS += -DHAVE_READLINE
+else ifneq ($(SKIPLINENOISE),1)
+    PM3CFLAGS += -DHAVE_LINENOISE
 endif
 
 ifeq ($(BT_FOUND),1)
@@ -463,6 +481,14 @@ else
         $(info Readline library:  enabled)
     else
         $(info Readline library:  Readline not found, disabled)
+    endif
+endif
+
+ifneq ($(READLINE_FOUND),1)
+    ifneq ($(SKIPLINENOISE),1)
+        $(info Linenoise library: enabled)
+    else
+        $(info Linenoise library: skipped)
     endif
 endif
 
@@ -739,6 +765,7 @@ clean:
 	$(Q)$(MAKE) --no-print-directory -C $(CLIPARSERLIBPATH) clean
 	$(Q)$(MAKE) --no-print-directory -C $(HARDNESTEDLIBPATH) clean
 	$(Q)$(MAKE) --no-print-directory -C $(JANSSONLIBPATH) clean
+	$(Q)$(MAKE) --no-print-directory -C $(LINENOISELIBPATH) clean
 	$(Q)$(MAKE) --no-print-directory -C $(LUALIBPATH) clean
 	$(Q)$(MAKE) --no-print-directory -C $(REVENGLIBPATH) clean
 	$(Q)$(MAKE) --no-print-directory -C $(TINYCBORLIBPATH) clean
@@ -792,6 +819,14 @@ $(JANSSONLIB): .FORCE
 ifneq ($(JANSSON_FOUND),1)
 	$(info [*] MAKE $@)
 	$(Q)$(MAKE) --no-print-directory -C $(JANSSONLIBPATH) all
+endif
+
+$(LINENOISELIB): .FORCE
+ifneq ($(READLINE_FOUND),1)
+    ifneq ($(SKIPLINENOISE),1)
+		$(info [*] MAKE $@)
+		$(Q)$(MAKE) --no-print-directory -C $(LINENOISELIBPATH) all
+    endif
 endif
 
 $(LUALIB): .FORCE

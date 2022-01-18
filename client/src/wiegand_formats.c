@@ -1446,7 +1446,7 @@ static const cardformat_t FormatTable[] = {
     {"D10202",  Pack_D10202,  Unpack_D10202,  "HID D10202 33-bit",          {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"H10306",  Pack_H10306,  Unpack_H10306,  "HID H10306 34-bit",          {1, 1, 0, 0, 1}}, // imported from old pack/unpack
     {"N10002",  Pack_N10002,  Unpack_N10002,  "Honeywell/Northern N10002 34-bit", {1, 1, 0, 0, 1}}, // from proxclone.com
-    {"PTProx25", Pack_PTProx25, Unpack_PTProx25, "Honeywell/Ademco PTProx25 34-bit", {1, 1, 0, 0, 1}}, // BT
+    {"PTProx25", Pack_PTProx25, Unpack_PTProx25, "Honeywell/Ademco PTProx25 34-bit", {1, 1, 0, 0, 1}}, // From @bthedorff; PR #1559
     {"Optus34", Pack_Optus,   Unpack_Optus,   "Indala Optus 34-bit",        {1, 1, 0, 0, 0}}, // from cardinfo.barkweb.com.au
     {"SMP34",   Pack_Smartpass, Unpack_Smartpass, "Cardkey Smartpass 34-bit", {1, 1, 1, 0, 0}}, // from cardinfo.barkweb.com.au
     {"BQT34",   Pack_bqt34,   Unpack_bqt34,   "BQT 34-bit",                 {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au

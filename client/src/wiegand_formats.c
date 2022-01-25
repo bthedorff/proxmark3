@@ -549,63 +549,6 @@ static bool Unpack_N10002(wiegand_message_t *packed, wiegand_card_t *card) {
     return true;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-static bool Pack_PTProx25(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
-    memset(packed, 0, sizeof(wiegand_message_t));
-
-    if (card->FacilityCode > 0xFFFF) return false; // Can't encode FC.
-    if (card->CardNumber > 0xFFFF) return false; // Can't encode CN.
-    if (card->IssueLevel > 0) return false; // Not used in this format
-    if (card->OEM > 0) return false; // Not used in this format
-
-    packed->Length = 34; // Set number of bits
-    set_linear_field(packed, card->FacilityCode, 1, 8);
-    set_linear_field(packed, card->CardNumber, 13, 20);
-    // unknown parity scheme
-    if (preamble)
-        return add_HID_header(packed);
-    return true;
-}
-
-static bool Unpack_PTProx25(wiegand_message_t *packed, wiegand_card_t *card) {
-    memset(card, 0, sizeof(wiegand_card_t));
-
-    if (packed->Length != 34) return false; // Wrong length? Stop here.
-
-    card->FacilityCode = get_linear_field(packed, 1, 8);
-    card->CardNumber = get_linear_field(packed, 13, 20);
-    // unknown parity scheme
-    return true;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 static bool Pack_C1k35s(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
     memset(packed, 0, sizeof(wiegand_message_t));
 
@@ -1446,7 +1389,6 @@ static const cardformat_t FormatTable[] = {
     {"D10202",  Pack_D10202,  Unpack_D10202,  "HID D10202 33-bit",          {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"H10306",  Pack_H10306,  Unpack_H10306,  "HID H10306 34-bit",          {1, 1, 0, 0, 1}}, // imported from old pack/unpack
     {"N10002",  Pack_N10002,  Unpack_N10002,  "Honeywell/Northern N10002 34-bit", {1, 1, 0, 0, 1}}, // from proxclone.com
-    {"PTProx25", Pack_PTProx25, Unpack_PTProx25, "Honeywell/Ademco PTProx25 34-bit", {1, 1, 0, 0, 1}}, // From @bthedorff; PR #1559
     {"Optus34", Pack_Optus,   Unpack_Optus,   "Indala Optus 34-bit",        {1, 1, 0, 0, 0}}, // from cardinfo.barkweb.com.au
     {"SMP34",   Pack_Smartpass, Unpack_Smartpass, "Cardkey Smartpass 34-bit", {1, 1, 1, 0, 0}}, // from cardinfo.barkweb.com.au
     {"BQT34",   Pack_bqt34,   Unpack_bqt34,   "BQT 34-bit",                 {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
@@ -1457,7 +1399,7 @@ static const cardformat_t FormatTable[] = {
     {"H10320",  Pack_H10320,  Unpack_H10320,  "HID H10320 36-bit BCD",      {1, 0, 0, 0, 1}}, // from Proxmark forums
     {"H10302",  Pack_H10302,  Unpack_H10302,  "HID H10302 37-bit huge ID",  {1, 0, 0, 0, 1}}, // from Proxmark forums
     {"H10304",  Pack_H10304,  Unpack_H10304,  "HID H10304 37-bit",          {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
-    {"P10004",  Pack_P10004,  Unpack_P10004,  "HID P10004 37-bit PCSC",     {1, 1, 0, 0, 0}}, // From @bthedorff; PR #
+    {"P10004",  Pack_P10004,  Unpack_P10004,  "HID P10004 37-bit PCSC",     {1, 1, 0, 0, 0}}, // from @bthedorff; PR #1559
     {"HGen37",  Pack_HGeneric37, Unpack_HGeneric37,  "HID Generic 37-bit", {1, 0, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"MDI37",   Pack_MDI37,   Unpack_MDI37,   "PointGuard MDI 37-bit",         {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"BQT38",   Pack_bqt38,   Unpack_bqt38,   "BQT 38-bit",                    {1, 1, 1, 0, 1}}, // from cardinfo.barkweb.com.au

@@ -1167,7 +1167,7 @@ static mfu_identify_t mfu_ident_table[] = {
     {
         "Xiaomi AIR Purifier", "0004040201000F03",
         0, 0, "",
-        ul_ev1_pwdgenE, ul_ev1_packgen_def,
+        ul_ev1_pwdgenE, ul_ev1_packgenE,
         "hf mfu dump -k %08x"
     },
     */
@@ -1228,7 +1228,7 @@ static int mfu_get_version_uid(uint8_t *version, uint8_t *uid) {
     return PM3_SUCCESS;
 }
 
-static int mfu_fingerprint(void) {
+static int mfu_fingerprint(TagTypeUL_t tagtype, bool hasAuthKey, uint8_t *authkey, int ak_len) {
 
     uint8_t *data = NULL;
     int res = PM3_SUCCESS;
@@ -1251,8 +1251,16 @@ static int mfu_fingerprint(void) {
     uint8_t pages = (maxbytes / 4);
     PrintAndLogEx(INFO, "Reading tag memory...");
 
+    uint8_t keytype = 0;
+    if (hasAuthKey) {
+        if (tagtype & UL_C)
+            keytype = 1; //UL_C auth
+        else
+            keytype = 2; //UL_EV1/NTAG auth
+    }
     clearCommandBuffer();
-    SendCommandMIX(CMD_HF_MIFAREU_READCARD, 0, pages, 0, NULL, 0);
+    SendCommandMIX(CMD_HF_MIFAREU_READCARD, 0, pages, keytype, authkey, ak_len);
+
     PacketResponseNG resp;
     if (!WaitForResponseTimeout(CMD_ACK, &resp, 2500)) {
         PrintAndLogEx(WARNING, "Command execute time-out");
@@ -1757,7 +1765,7 @@ static int CmdHF14AMfUInfo(const char *Cmd) {
         }
     }
 
-    mfu_fingerprint();
+    mfu_fingerprint(tagtype, has_auth_key, authkeyptr, ak_len);
 
 out:
     DropField();
@@ -2365,7 +2373,7 @@ static int CmdHF14AMfUDump(const char *Cmd) {
 
     // format and add keys to block dump output
     // only add keys if not partial read, and complete pages read
-    if (!is_partial && pages == card_mem_size && has_auth_key) {
+    if (!is_partial && pages == card_mem_size && (has_auth_key || has_pwd)) {
         // if we didn't swapendian before - do it now for the sprint_hex call
         // NOTE: default entry is bigendian (unless swapped), sprint_hex outputs little endian
         //       need to swap to keep it the same
@@ -3194,7 +3202,7 @@ static int CmdHF14AMfUPwdGen(const char *Cmd) {
     PrintAndLogEx(INFO, " Amiibo          | %08X | %04X", ul_ev1_pwdgenB(uid), ul_ev1_packgenB(uid));
     PrintAndLogEx(INFO, " Lego Dimension  | %08X | %04X", ul_ev1_pwdgenC(uid), ul_ev1_packgenC(uid));
     PrintAndLogEx(INFO, " XYZ 3D printer  | %08X | %04X", ul_ev1_pwdgenD(uid), ul_ev1_packgenD(uid));
-    PrintAndLogEx(INFO, " Xiaomi purifier | %08X | %04X", ul_ev1_pwdgenE(uid), ul_ev1_packgen_def(uid));
+    PrintAndLogEx(INFO, " Xiaomi purifier | %08X | %04X", ul_ev1_pwdgenE(uid), ul_ev1_packgenE(uid));
     PrintAndLogEx(INFO, "-----------------+----------+-----");
     PrintAndLogEx(INFO, " Vingcard algo");
     PrintAndLogEx(INFO, "----------------------------------");

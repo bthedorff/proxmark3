@@ -423,13 +423,17 @@ static int CmdDesGetSessionParameters(CLIParserContext *ctx, DesfireContext_t *d
     int algores = defaultAlgoId;
     uint8_t key[DESFIRE_MAX_KEY_SIZE] = {0};
     memcpy(key, defaultKey, DESFIRE_MAX_KEY_SIZE);
+
     int kdfAlgo = defaultKdfAlgo;
+
     int kdfInputLen = defaultKdfInputLen;
     uint8_t kdfInput[50] = {0};
     memcpy(kdfInput, defaultKdfInput, defaultKdfInputLen);
+
     int commmode = defaultCommMode;
     if (defcommmode != DCMNone)
         commmode = defcommmode;
+
     int commset = defaultCommSet;
     int secchann = defaultSecureChannel;
 
@@ -2012,16 +2016,16 @@ static int CmdHF14ADesAuth(const char *Cmd) {
         arg_param_begin,
         arg_lit0("a",  "apdu",    "show APDU requests and responses"),
         arg_lit0("v",  "verbose", "show technical data"),
-        arg_int0("n",  "keyno",   "<keyno>", "Key number"),
-        arg_str0("t",  "algo",    "<DES/2TDEA/3TDEA/AES>",  "Crypt algo: DES, 2TDEA, 3TDEA, AES"),
-        arg_str0("k",  "key",     "<Key>",   "Key for authenticate (HEX 8(DES), 16(2TDEA or AES) or 24(3TDEA) bytes)"),
-        arg_str0("f",  "kdf",     "<none/AN10922/gallagher>",   "Key Derivation Function (KDF): None, AN10922, Gallagher"),
-        arg_str0("i",  "kdfi",    "<kdfi>",  "KDF input (HEX 1-31 bytes)"),
-        arg_str0("m",  "cmode",   "<plain/mac/encrypt>", "Communicaton mode: plain/mac/encrypt"),
-        arg_str0("c",  "ccset",   "<native/niso/iso>", "Communicaton command set: native/niso/iso"),
-        arg_str0("s",  "schann",  "<d40/ev1/ev2/lrp>", "Secure channel: d40/ev1/ev2/lrp"),
-        arg_str0(NULL, "aid",     "<app id hex>", "Application ID of application for some parameters (3 hex bytes, big endian)"),
-        arg_str0(NULL, "appisoid", "<isoid hex>", "Application ISO ID (ISO DF ID) (2 hex bytes, big endian)."),
+        arg_int0("n",  "keyno",   "<dec>", "Key number"),
+        arg_str0("t",  "algo",    "<DES|2TDEA|3TDEA|AES>",  "Crypt algo: DES, 2TDEA, 3TDEA, AES"),
+        arg_str0("k",  "key",     "<hex>",   "Key for authenticate (HEX 8(DES), 16(2TDEA or AES) or 24(3TDEA) bytes)"),
+        arg_str0("f",  "kdf",     "<none|AN10922|gallagher>",   "Key Derivation Function (KDF): None, AN10922, Gallagher"),
+        arg_str0("i",  "kdfi",    "<hex>",  "KDF input (HEX 1-31 bytes)"),
+        arg_str0("m",  "cmode",   "<plain|mac|encrypt>", "Communicaton mode: plain/mac/encrypt"),
+        arg_str0("c",  "ccset",   "<native|niso|iso>", "Communicaton command set: native/niso/iso"),
+        arg_str0("s",  "schann",  "<d40|ev1|ev2|lrp>", "Secure channel: d40/ev1/ev2/lrp"),
+        arg_str0(NULL, "aid",     "<hex>", "Application ID of application for some parameters (3 hex bytes, big endian)"),
+        arg_str0(NULL, "appisoid", "<hex>", "Application ISO ID (ISO DF ID) (2 hex bytes, big endian)."),
         arg_lit0(NULL, "save",    "saves channels parameters to defaults if authentication succeeds"),
         arg_param_end
     };
@@ -3397,15 +3401,11 @@ static int CmdHF14ADesGetFileSettings(const char *Cmd) {
 
 static int DesfireCreateFileParameters(
     CLIParserContext *ctx,
-
     uint8_t pfileid, uint8_t pisofileid,
-    uint8_t amodeid,
-    uint8_t frightsid,
+    uint8_t amodeid, uint8_t frightsid,
     uint8_t r_modeid, uint8_t w_modeid, uint8_t rw_modeid, uint8_t ch_modeid,
+    uint8_t *data, size_t *datalen ) {
 
-    uint8_t *data,
-    size_t *datalen
-) {
     *datalen = 0;
 
     uint32_t fileid = 1;
@@ -4474,7 +4474,11 @@ static int CmdHF14ADesClearRecordFile(const char *Cmd) {
     return PM3_SUCCESS;
 }
 
-static int DesfileReadISOFileAndPrint(DesfireContext_t *dctx, bool select_current_file, uint8_t fnum, uint16_t fisoid, int filetype, uint32_t offset, uint32_t length, bool noauth, bool verbose) {
+static int DesfileReadISOFileAndPrint(DesfireContext_t *dctx,
+          bool select_current_file, uint8_t fnum,
+          uint16_t fisoid, int filetype, 
+          uint32_t offset, uint32_t length,
+          bool noauth, bool verbose) {
 
     if (filetype == RFTAuto) {
         PrintAndLogEx(ERR, "ISO mode needs to specify file type");
@@ -4498,7 +4502,7 @@ static int DesfileReadISOFileAndPrint(DesfireContext_t *dctx, bool select_curren
 
     uint8_t resp[2048] = {0};
     size_t resplen = 0;
-    int res = 0;
+    int res;
 
     if (filetype == RFTData) {
         res = DesfireISOReadBinary(dctx, !select_current_file, (select_current_file) ? 0x00 : fnum, offset, length, resp, &resplen);
@@ -4568,8 +4572,12 @@ static int DesfileReadISOFileAndPrint(DesfireContext_t *dctx, bool select_curren
     return PM3_SUCCESS;
 }
 
-static int DesfileReadFileAndPrint(DesfireContext_t *dctx, uint8_t fnum, int filetype, uint32_t offset, uint32_t length, uint32_t maxdatafilelength, bool noauth, bool verbose) {
-    int res = 0;
+static int DesfileReadFileAndPrint(DesfireContext_t *dctx, 
+          uint8_t fnum, int filetype,
+          uint32_t offset, uint32_t length,
+          uint32_t maxdatafilelength, bool noauth, bool verbose) {
+
+    int res;
     // length of record for record file
     size_t reclen = 0;
 
@@ -4880,7 +4888,11 @@ static int CmdHF14ADesReadData(const char *Cmd) {
     return res;
 }
 
-static int DesfileWriteISOFile(DesfireContext_t *dctx, bool select_current_file, uint8_t fnum, uint16_t fisoid, int filetype, uint32_t offset, uint8_t *data, uint32_t datalen, bool verbose) {
+static int DesfileWriteISOFile(DesfireContext_t *dctx,
+          bool select_current_file, uint8_t fnum,
+          uint16_t fisoid, int filetype,
+          uint32_t offset, uint8_t *data,
+          uint32_t datalen, bool verbose) {
 
     if (filetype == RFTAuto) {
         PrintAndLogEx(ERR, "ISO mode needs to specify file type");
@@ -4902,7 +4914,7 @@ static int DesfileWriteISOFile(DesfireContext_t *dctx, bool select_current_file,
         return PM3_EINVARG;
     }
 
-    int res = 0;
+    int res;
     if (filetype == RFTData) {
         res = DesfireISOUpdateBinary(dctx, !select_current_file, (select_current_file) ? 0x00 : fnum, offset, data, datalen);
         if (res != PM3_SUCCESS) {

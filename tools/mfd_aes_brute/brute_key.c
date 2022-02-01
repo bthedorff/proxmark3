@@ -25,10 +25,12 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <limits.h>
+#include <string.h>
 #include <openssl/evp.h>
 #include <openssl/err.h>
-#include <string.h>
+
 
 uint32_t seed = 0;
 
@@ -107,7 +109,7 @@ int main (int argc, char* argv[]) {
     uint8_t tag_challenge[16]  = {0x00};
     uint8_t lock_challenge[32] = {0x00};
 
-    int timestamp = atoi(argv[1]);
+    uint64_t timestamp = atoi(argv[1]);
 
     if (argc != 4) {
         printf("\nusage: %s <unix timestamp> <16 byte tag challenge> <32 byte lock challenge>\n\n", argv[0]);
@@ -120,7 +122,7 @@ int main (int argc, char* argv[]) {
     if(hexstr_to_byte_array(argv[3], lock_challenge, sizeof(lock_challenge)))
         return 3;
 
-    int start_time = time(NULL);
+    uint64_t start_time = time(NULL);
 
     for (; timestamp < start_time; timestamp++) {
 
@@ -149,7 +151,7 @@ int main (int argc, char* argv[]) {
         if (dec_tag[15] != dec_rdr[30]) continue;
 
 
-        printf("\btimestamp: %i\nkey: ", timestamp);
+        printf("\btimestamp: %" PRIu64 "\nkey: ", timestamp);
         for (int i = 0; i < 16; i++) {
             printf("%02x", key[i]);
         }

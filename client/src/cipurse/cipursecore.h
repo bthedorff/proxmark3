@@ -27,6 +27,7 @@
 
 
 #define CIPURSE_DEFAULT_KEY {0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73, 0x73}
+#define CIPURSE_DEFAULT_AID {0x41, 0x44, 0x20, 0x46, 0x31}
 
 void CIPURSEPrintInfoFile(uint8_t *data, size_t len);
 
@@ -60,5 +61,6 @@ bool CIPURSEChannelAuthenticate(uint8_t keyindex, uint8_t *key, bool verbose);
 void CIPURSECSetActChannelSecurityLevels(CipurseChannelSecurityLevel req, CipurseChannelSecurityLevel resp);
 
 void CIPURSEPrintFileAttr(uint8_t *attr, size_t len);
+void CIPURSEPrintFileDescriptor(uint8_t desc);
 
 #endif /* __CIPURSECORE_H__ */

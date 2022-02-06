@@ -120,6 +120,77 @@ select it with display output in raw and tlv views options
 ```hf cipurse delete --aid 4144204631 --chfid 0102```
 
 
+### How read file
+^[Top](#top)
+
+with default key and aid
+```hf cipurse read --fid 0102```
+
+with default key and specified aid
+```hf cipurse read --aid a0000005070100```
+
+with default key and aid without authentication
+```hf cipurse read --fid 0102 --no-auth```
+
+
+### How write file
+^[Top](#top)
+
+with default key and aid
+```hf cipurse read --fid 0102 -d abbbccdd```
+
+with default key and specified aid
+```hf cipurse read --aid a0000005070100 -d abbbccdd```
+
+with default key and aid without authentication
+```hf cipurse read --fid 0102 -d abbbccdd --no-auth```
+
+with default key and aid, perform commit (works for files with transactions mechanism switched on)
+```hf cipurse read --fid 0102 -d abbbccdd --commit```
+
+
+### How read file attributes
+^[Top](#top)
+
+read master file attributes
+```hf cipurse aread --mfd```
+
+read EF.ID_INFO root file attributes
+```hf cipurse aread --fid 2ff7```
+
+read PxSE application attributes
+```hf cipurse aread --aid a0000005070100```
+
+read application attributes
+```hf cipurse aread --aid 4144204632```
+
+read file (EF) attributes
+
+```hf cipurse aread --aid 4144204632 --chfid 0102```
+
+or with default application
+
+```hf cipurse aread --aid 4144204632 --chfid 0102```
+
+
+### How set file attributes
+^[Top](#top)
+
+set elementary file attributes (EF)
+
+  full access wo keys
+```hf cipurse awrite --chfid 0102 -d 020000ffffff```
+
+  read access wo keys and full with all 2 keys
+```hf cipurse awrite --chfid 0102 -d 02000040ffff```
+
+set EF.ID_INFO file attributes
+```hf cipurse awrite --fid 2ff7 -d 080000C1C1C1C1C1C1C1C1C1``` (as default)
+
+set master file (MF) file attributes
+```hf cipurse awrite --mfd -d 080000FFFFFFFFFFFFFFFFFF86023232 --commit``` (full access with/wo keys and tag 86 is set by `22`)
+
+
 ### How to personalize card
 ^[Top](#top)
 
@@ -186,4 +257,20 @@ or if file with transaction mechanism
 **6. Check file(s) contents (if needs)**
 ```hf cipurse read --fid 0102```
 
+
+**8. Set the keys and needed key attributes**
+
+TBW
+
+
+**8. Set the file attributes**
+
+Set file attributes for:
+1. All the elementary files (EF)
+2. Info files (EF.ID_INFO)
+3. Application(s)
+4. PxSE application
+5. Master file itself (MF)
+
+*(in this specific order!!!)*
 

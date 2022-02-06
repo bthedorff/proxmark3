@@ -79,7 +79,7 @@ static bool merge_topaz_reader_frames(uint32_t timestamp, uint32_t *duration, ui
 
     return true;
 }
-static uint8_t calc_pos(uint8_t *d){
+static uint8_t calc_pos(uint8_t *d) {
     // PCB [CID] [NAD] [INF] CRC CRC
     uint8_t pos = 1;
     if ((d[0] & 0x08) == 0x08)  // cid byte following
@@ -88,7 +88,7 @@ static uint8_t calc_pos(uint8_t *d){
     if ((d[0] & 0x04) == 0x04)  // nad byte following
         pos++;
 
-    return pos;    
+    return pos;
 }
 
 static uint8_t extract_uid[10] = {0};
@@ -97,9 +97,30 @@ static uint8_t extract_epurse[8] = {0};
 
 #define SKIP_TO_NEXT(a)  (TRACELOG_HDR_LEN + (a)->data_len + TRACELOG_PARITY_LEN((a)))
 
+static uint16_t extractChall_ev2(uint16_t tracepos, uint8_t *trace, uint8_t cmdpos, uint8_t long_jmp) {
+    tracelog_hdr_t *next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+    if (next_hdr->data_len != 21) {
+        return 0;
+    }
+
+    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
+
+    PrintAndLogEx(INFO, "1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, 16));
+
+    next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
+
+    if (next_hdr->frame[cmdpos] == MFDES_ADDITIONAL_FRAME) {
+        PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + cmdpos + long_jmp, 32));
+    } else {
+        PrintAndLogEx(NORMAL, "");
+    }
+    return tracepos;
+}
+
 static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t *trace) {
 
-    // sanity check 
+    // sanity check
     if (is_last_record(tracepos, traceLen)) {
         return traceLen;
     }
@@ -111,9 +132,9 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
     // sanity check tracking position is less then available trace size
     if (tracepos + TRACELOG_HDR_LEN + data_len + TRACELOG_PARITY_LEN(hdr) > traceLen) {
         PrintAndLogEx(DEBUG, "trace pos offset %"PRIu64 " larger than reported tracelen %u",
-            tracepos + TRACELOG_HDR_LEN + data_len + TRACELOG_PARITY_LEN(hdr),
-            traceLen
-            );
+                      tracepos + TRACELOG_HDR_LEN + data_len + TRACELOG_PARITY_LEN(hdr),
+                      traceLen
+                     );
         return traceLen;
     }
 
@@ -139,7 +160,7 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
         }
     }
 
-    // extract MFU-C       
+    // extract MFU-C
     switch (frame[0]) {
         case MIFARE_ULC_AUTH_1: {
             if (data_len != 4) {
@@ -154,7 +175,7 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
             }
 
             if (next_hdr->frame[0] != MIFARE_ULC_AUTH_2) {
-                break;                        
+                break;
             }
 
             PrintAndLogEx(INFO, "MFU-C AUTH");
@@ -166,16 +187,16 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
             if (next_hdr->frame[0] == MIFARE_ULC_AUTH_2 && next_hdr->data_len == 19) {
                 PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + 1, 16));
             }
-            
+
             return tracepos;
         }
     }
 
     // extract iCLASS
     // --csn 9655a400f8ff12e0 --epurse f0ffffffffffffff --macs 0000000089cb984b
-    
+
     if (hdr->isResponse == false)  {
-       
+
         uint8_t c = frame[0] & 0x0F;
         switch (c) {
             case ICLASS_CMD_SELECT: {
@@ -208,7 +229,7 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
                     if (extract_uidlen == 8) {
                         PrintAndLogEx(INFO, "hf iclass lookup --csn %s " NOLF, sprint_hex_inrow(extract_uid, extract_uidlen));
                         PrintAndLogEx(NORMAL, "--epurse %s " NOLF, sprint_hex_inrow(extract_epurse, 8));
-                        PrintAndLogEx(NORMAL, "--macs %s " NOLF, sprint_hex_inrow(frame + 1, 8) );
+                        PrintAndLogEx(NORMAL, "--macs %s " NOLF, sprint_hex_inrow(frame + 1, 8));
                         PrintAndLogEx(NORMAL, "-f iclass_default_keys.dic");
                         return tracepos;
                     }
@@ -248,7 +269,7 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
                     memcpy(extract_uid + extract_uidlen, frame + 2, 4);
                     extract_uidlen += 4;
                     PrintAndLogEx(INFO, "UID... " _YELLOW_("%s"), sprint_hex_inrow(extract_uid, extract_uidlen));
-                }   
+                }
             }
             break;
         }
@@ -270,6 +291,10 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
         return tracepos;
     }
 
+    if (hdr->isResponse) {
+        return tracepos;
+    }
+
     // PCB [CID] [NAD] [INF] CRC CRC
     uint8_t pos = calc_pos(frame);
     uint8_t long_jmp = (data_len > 6) ? 4 : 1;
@@ -279,96 +304,106 @@ static uint16_t extractChallenges(uint16_t tracepos, uint16_t traceLen, uint8_t 
         switch (frame[pos]) {
 
             case MFDES_AUTHENTICATE: {
-                // Assume wrapped or unwrapped 
+
+                // Assume wrapped or unwrapped
                 PrintAndLogEx(INFO, "AUTH NATIVE (keyNo %d)", frame[pos + long_jmp]);
-                
-                if (hdr->isResponse == false && next_record_is_response(tracepos, trace)) {
+                if (next_record_is_response(tracepos, trace) == false) {
+                    break;
+                }
 
-                    tracelog_hdr_t *next_hdr = (tracelog_hdr_t *)(trace + tracepos);
-                    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
-                    if (next_hdr->data_len < 7) {
-                        break;
-                    }
+                tracelog_hdr_t *next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+                if (next_hdr->data_len < 7) {
+                    break;
+                }
+                tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
 
-                    PrintAndLogEx(INFO, "DES 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, 8));
+                PrintAndLogEx(INFO, "DES 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, 8));
 
-                    next_hdr = (tracelog_hdr_t *)(trace + tracepos);
-                    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
+                next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+                tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
 
-                    if (next_hdr->frame[pos] == MFDES_ADDITIONAL_FRAME) {
-                        PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + pos + long_jmp, 16));
-                    }
-                    return tracepos;
-                }    
-                break;  // AUTHENTICATE_NATIVE
+                if (next_hdr->frame[pos] == MFDES_ADDITIONAL_FRAME) {
+                    PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + pos + long_jmp, 16));
+                } else {
+                    PrintAndLogEx(NORMAL, "");
+                }
+                return tracepos;   // AUTHENTICATE_NATIVE
             }
             case MFDES_AUTHENTICATE_ISO: {
-
-                // Assume wrapped or unwrapped 
+                // Assume wrapped or unwrapped
                 PrintAndLogEx(INFO, "AUTH ISO (keyNo %d)", frame[pos + long_jmp]);
-                if (hdr->isResponse == false && next_record_is_response(tracepos, trace)) {
-
-                    tracelog_hdr_t *next_hdr = (tracelog_hdr_t *)(trace + tracepos);
-                    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
-                    if (next_hdr->data_len < 7) {
-                        break;
-                    }
-
-                    uint8_t tdea = 8;
-                    if (next_hdr->data_len > 20) {
-                        tdea = 16;
-                        PrintAndLogEx(INFO, "3TDEA 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, tdea));
-                    } else {
-                        PrintAndLogEx(INFO, "2TDEA 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, tdea));
-                    }
-
-                    next_hdr = (tracelog_hdr_t *)(trace + tracepos);
-                    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
-
-                    if (next_hdr->frame[pos] == MFDES_ADDITIONAL_FRAME) {
-                        PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + pos + long_jmp, (tdea<<1)));
-                    }
-                    return tracepos;
+                if (next_record_is_response(tracepos, trace) == false) {
+                    break;
                 }
 
-                break;  // AUTHENTICATE_STANDARD
+                tracelog_hdr_t *next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+                tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
+                if (next_hdr->data_len < 7) {
+                    break;
+                }
+
+                uint8_t tdea = 8;
+                if (next_hdr->data_len > 20) {
+                    tdea = 16;
+                    PrintAndLogEx(INFO, "3TDEA 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, tdea));
+                } else {
+                    PrintAndLogEx(INFO, "2TDEA 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, tdea));
+                }
+
+                next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+                tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
+
+                if (next_hdr->frame[pos] == MFDES_ADDITIONAL_FRAME) {
+                    PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + pos + long_jmp, (tdea << 1)));
+                } else {
+                    PrintAndLogEx(NORMAL, "");
+                }
+                return tracepos;  // AUTHENTICATE_STANDARD
             }
             case MFDES_AUTHENTICATE_AES: {
-                // Assume wrapped or unwrapped 
+                // Assume wrapped or unwrapped
                 PrintAndLogEx(INFO, "AUTH AES (keyNo %d)", frame[pos + long_jmp]);
-                if (hdr->isResponse == false && next_record_is_response(tracepos, trace)) {
-
-                    tracelog_hdr_t *next_hdr = (tracelog_hdr_t *)(trace + tracepos);
-                    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
-                    if (next_hdr->data_len < 7) {
-                        break;
-                    }
-                    PrintAndLogEx(INFO, "AES 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, 8));
-
-                    next_hdr = (tracelog_hdr_t *)(trace + tracepos);
-                    tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
-
-                    if (next_hdr->frame[pos] == MFDES_ADDITIONAL_FRAME) {
-                        PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + pos + long_jmp, 16));
-                    }
-                    return tracepos;
+                if (next_record_is_response(tracepos, trace)) {
+                    break;
                 }
-                break;
+
+                tracelog_hdr_t *next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+                tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
+                if (next_hdr->data_len < 7) {
+                    break;
+                }
+
+                PrintAndLogEx(INFO, "AES 1499999999 %s " NOLF, sprint_hex_inrow(next_hdr->frame + 1, 8));
+
+                next_hdr = (tracelog_hdr_t *)(trace + tracepos);
+                tracepos += TRACELOG_HDR_LEN + next_hdr->data_len + TRACELOG_PARITY_LEN(next_hdr);
+
+                if (next_hdr->frame[pos] == MFDES_ADDITIONAL_FRAME) {
+                    PrintAndLogEx(NORMAL, "%s", sprint_hex_inrow(next_hdr->frame + pos + long_jmp, 16));
+                } else {
+                    PrintAndLogEx(NORMAL, "");
+                }
+                return tracepos;
             }
             case MFDES_AUTHENTICATE_EV2F: {
-                if (hdr->isResponse == false) {
-                    PrintAndLogEx(INFO, "AUTH EV2 First");
-                }
-                break;
+                PrintAndLogEx(INFO, "AUTH EV2 First");
+                uint16_t tmp = extractChall_ev2(tracepos, trace, pos, long_jmp);
+                if (tmp == 0)
+                    break;
+                else
+                    return tmp;
+
             }
             case MFDES_AUTHENTICATE_EV2NF: {
-                if (hdr->isResponse == false) {
-                    PrintAndLogEx(INFO, "AUTH EV2 Non First");
-                }
-                break;
+                PrintAndLogEx(INFO, "AUTH EV2 Non First");
+                uint16_t tmp = extractChall_ev2(tracepos, trace, pos, long_jmp);
+                if (tmp == 0)
+                    break;
+                else
+                    return tmp;
             }
         }
-    } 
+    }
 
     return tracepos;
 }
@@ -455,9 +490,9 @@ static uint16_t printTraceLine(uint16_t tracepos, uint16_t traceLen, uint8_t *tr
 
     if (tracepos + TRACELOG_HDR_LEN + data_len + TRACELOG_PARITY_LEN(hdr) > traceLen) {
         PrintAndLogEx(DEBUG, "trace pos offset %"PRIu64 " larger than reported tracelen %u",
-            tracepos + TRACELOG_HDR_LEN + data_len + TRACELOG_PARITY_LEN(hdr),
-            traceLen
-            );
+                      tracepos + TRACELOG_HDR_LEN + data_len + TRACELOG_PARITY_LEN(hdr),
+                      traceLen
+                     );
         return traceLen;
     }
 
@@ -895,7 +930,7 @@ static int CmdTraceExtract(const char *Cmd) {
 
     void *argtable[] = {
         arg_param_begin,
-        arg_lit0("1", "buffer", "use data from trace buffer"),        
+        arg_lit0("1", "buffer", "use data from trace buffer"),
         arg_param_end
     };
     CLIExecWithReturn(ctx, Cmd, argtable, true);

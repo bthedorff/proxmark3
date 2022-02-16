@@ -137,17 +137,17 @@ Check column "offline" for their availability.
 |command                  |offline |description
 |-------                  |------- |-----------
 |`emv help               `|Y       |`This help`
-|`emv exec               `|N       |`Executes EMV contactless transaction.`
-|`emv pse                `|N       |`Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory.`
-|`emv search             `|N       |`Try to select all applets from applets list and print installed applets.`
-|`emv select             `|N       |`Select applet.`
-|`emv gpo                `|N       |`Execute GetProcessingOptions.`
-|`emv readrec            `|N       |`Read files from card.`
-|`emv genac              `|N       |`Generate ApplicationCryptogram.`
-|`emv challenge          `|N       |`Generate challenge.`
-|`emv intauth            `|N       |`Internal authentication.`
-|`emv scan               `|N       |`Scan EMV card and save it contents to json file for emulator.`
-|`emv test               `|Y       |`Crypto logic test.`
+|`emv exec               `|N       |`Executes EMV contactless transaction`
+|`emv pse                `|N       |`Execute PPSE. It selects 2PAY.SYS.DDF01 or 1PAY.SYS.DDF01 directory`
+|`emv search             `|N       |`Try to select all applets from applets list and print installed applets`
+|`emv select             `|N       |`Select applet`
+|`emv gpo                `|N       |`Execute GetProcessingOptions`
+|`emv readrec            `|N       |`Read files from card`
+|`emv genac              `|N       |`Generate ApplicationCryptogram`
+|`emv challenge          `|N       |`Generate challenge`
+|`emv intauth            `|N       |`Internal authentication`
+|`emv scan               `|N       |`Scan EMV card and save it contents to json file for emulator`
+|`emv test               `|Y       |`Crypto logic test`
 |`emv list               `|Y       |`List ISO7816 history`
 |`emv roca               `|N       |`Extract public keys and run ROCA test`
 
@@ -252,6 +252,8 @@ Check column "offline" for their availability.
 |`hf cipurse formatall   `|N       |`Erase all the data from chip`
 |`hf cipurse create      `|N       |`Create file, application, key via DGI record`
 |`hf cipurse delete      `|N       |`Delete file`
+|`hf cipurse updkey      `|N       |`Update key`
+|`hf cipurse updakey     `|N       |`Update key attributes`
 |`hf cipurse default     `|N       |`Set default key and file id for all the other commands`
 |`hf cipurse test        `|Y       |`Tests`
 
@@ -399,18 +401,20 @@ Check column "offline" for their availability.
 |command                  |offline |description
 |-------                  |------- |-----------
 |`hf legic help          `|Y       |`This help`
-|`hf legic list          `|Y       |`List LEGIC history`
-|`hf legic reader        `|N       |`LEGIC Prime Reader UID and tag info`
-|`hf legic info          `|N       |`Display deobfuscated and decoded LEGIC Prime tag data`
 |`hf legic dump          `|N       |`Dump LEGIC Prime tag to binary file`
-|`hf legic restore       `|N       |`Restore a dump file onto a LEGIC Prime tag`
+|`hf legic info          `|N       |`Display deobfuscated and decoded LEGIC Prime tag data`
+|`hf legic list          `|Y       |`List LEGIC history`
 |`hf legic rdbl          `|N       |`Read bytes from a LEGIC Prime tag`
-|`hf legic sim           `|N       |`Start tag simulator`
-|`hf legic wrbl          `|N       |`Write data to a LEGIC Prime tag`
-|`hf legic crc           `|Y       |`Calculate Legic CRC over given bytes`
-|`hf legic eload         `|Y       |`Load binary dump to emulator memory`
-|`hf legic esave         `|Y       |`Save emulator memory to binary file`
+|`hf legic reader        `|N       |`LEGIC Prime Reader UID and tag info`
+|`hf legic restore       `|N       |`Restore a dump file onto a LEGIC Prime tag`
 |`hf legic wipe          `|N       |`Wipe a LEGIC Prime tag`
+|`hf legic wrbl          `|N       |`Write data to a LEGIC Prime tag`
+|`hf legic sim           `|N       |`Start tag simulator`
+|`hf legic eload         `|N       |`Load binary dump to emulator memory`
+|`hf legic esave         `|N       |`Save emulator memory to binary file`
+|`hf legic eview         `|N       |`View emulator memory`
+|`hf legic crc           `|Y       |`Calculate Legic CRC over given bytes`
+|`hf legic view          `|Y       |`Display content from tag dump file`
 
 
 ### hf lto
@@ -519,8 +523,9 @@ Check column "offline" for their availability.
 |`hf mfu ndefread        `|N       |`Prints NDEF records from card`
 |`hf mfu rdbl            `|N       |`Read block`
 |`hf mfu restore         `|N       |`Restore a dump onto a MFU MAGIC tag`
+|`hf mfu view            `|Y       |`Display content from tag dump file`
 |`hf mfu wrbl            `|N       |`Write block`
-|`hf mfu eload           `|N       |`load Ultralight .eml dump file into emulator memory`
+|`hf mfu eload           `|N       |`Load Ultralight .eml dump file into emulator memory`
 |`hf mfu eview           `|N       |`View emulator memory`
 |`hf mfu sim             `|N       |`Simulate MIFARE Ultralight from emulator memory`
 |`hf mfu setpwd          `|N       |`Set 3DES key - Ultralight-C`

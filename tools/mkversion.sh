@@ -63,8 +63,11 @@ sha=$(
     cd "$pm3path" || return
     # did we find the src?
     [ -f armsrc/appmain.c ] || return
-    ls armsrc/*.[ch] common_arm/*.[ch]|grep -E -v "(disabled|version_pm3|fpga_version_info)"|xargs sha256sum|sha256sum|grep -o '^.........'
+    ls armsrc/*.[ch] common_arm/*.[ch]|grep -E -v "(disabled|version_pm3|fpga_version_info)"|xargs sha256sum|sha256sum|cut -c -9
 )
+if [ "$sha" = "" ]; then
+  sha="no sha256"
+fi
 cat <<EOF
 #include "common.h"
 /* Generated file, do not edit */

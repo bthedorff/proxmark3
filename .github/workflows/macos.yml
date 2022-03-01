@@ -37,13 +37,6 @@ jobs:
       - name: Install dependencies
         run: brew install readline coreutils qt5 RfidResearchGroup/proxmark3/arm-none-eabi-gcc openssl
 
-      - name: Fix linkings for qt5 and openssl
-        working-directory: /usr/local/include
-        continue-on-error: true
-        run: |
-          ln -svf ../opt/openssl@3/include/openssl .
-          ln -svf ../opt/qt@5/include/qt .
-
       - name: Install Python dependencies
         run: |
           python3 -m pip install --upgrade pip
@@ -84,13 +77,6 @@ jobs:
 
       - name: Install dependencies
         run: brew install readline coreutils qt5 RfidResearchGroup/proxmark3/arm-none-eabi-gcc openssl
-
-      - name: Fix linkings for qt5 and openssl
-        working-directory: /usr/local/include
-        continue-on-error: true
-        run: |
-          ln -svf ../opt/openssl@3/include/openssl .
-          ln -svf ../opt/qt@5/include/qt .
 
       - name: Install Python dependencies
         run: |
@@ -133,13 +119,6 @@ jobs:
 
       - name: Install dependencies
         run: brew install readline coreutils qt5 RfidResearchGroup/proxmark3/arm-none-eabi-gcc openssl
-
-      - name: Fix linkings for qt5 and openssl
-        working-directory: /usr/local/include
-        continue-on-error: true
-        run: |
-          ln -svf ../opt/openssl@3/include/openssl .
-          ln -svf ../opt/qt@5/include/qt .
 
       - name: Install Python dependencies
         run: |

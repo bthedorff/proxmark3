@@ -15,6 +15,7 @@ STANDALONE=LF_PROXBRUTE
 #STANDALONE=LF_THAREXDE
 #STANDALONE=HF_ICECLASS
 #STANDALONE=DANKARMULTI
+#STANDALONE=HF_AVEFUL
 
 # To accelerate repetitive compilations:
 # Install package "ccache" -> Debian/Ubuntu: /usr/lib/ccache, Fedora/CentOS/RHEL: /usr/lib64/ccache

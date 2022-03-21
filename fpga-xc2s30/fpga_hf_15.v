@@ -19,14 +19,7 @@
 // through, so that the ARM gets raw A/D samples over the SSP. In the high-
 // frequency modes, the FPGA might perform some demodulation first, to
 // reduce the amount of data that we must send to the ARM.
-//
-// I am not really an FPGA/ASIC designer, so I am sure that a lot of this
-// could be improved.
-//
-// Jonathan Westhues, March 2006
-//
-// Added ISO14443-A support
-//
+//-----------------------------------------------------------------------------
 
 
 // Defining commands, modes and options. This must be aligned to the definitions in fpgaloader.h
@@ -43,6 +36,7 @@
 `define FPGA_MAJOR_MODE_HF_SNIFF                    3
 `define FPGA_MAJOR_MODE_HF_ISO18092                 4
 `define FPGA_MAJOR_MODE_HF_GET_TRACE                5
+`define FPGA_MAJOR_MODE_HF_FSK_READER               6
 `define FPGA_MAJOR_MODE_OFF                         7
 
 // Options for the generic HF reader
@@ -59,6 +53,15 @@
 `define FPGA_HF_READER_SUBCARRIER_848_KHZ           0
 `define FPGA_HF_READER_SUBCARRIER_424_KHZ           1
 `define FPGA_HF_READER_SUBCARRIER_212_KHZ           2
+`define FPGA_HF_READER_2SUBCARRIERS_424_484_KHZ     3
+
+`define FPGA_HF_FSK_READER_OUTPUT_1695_KHZ          0
+`define FPGA_HF_FSK_READER_OUTPUT_848_KHZ           1
+`define FPGA_HF_FSK_READER_OUTPUT_424_KHZ           2
+`define FPGA_HF_FSK_READER_OUTPUT_212_KHZ           3
+
+`define FPGA_HF_FSK_READER_NOPOWER                  0
+`define FPGA_HF_FSK_READER_WITHPOWER                1
 
 // Options for the HF simulated tag, how to modulate
 `define FPGA_HF_SIMULATOR_NO_MODULATION             0
@@ -79,15 +82,15 @@
 `define FPGA_HF_ISO18092_FLAG_424K                  2 // 0010 should enable 414k mode (untested). No autodetect
 `define FPGA_HF_ISO18092_FLAG_READER                4 // 0100 enables antenna power, to act as a reader instead of tag
 
-`include "hi_reader.v"
+`include "hi_reader_15.v"
 `include "hi_simulate.v"
 //`include "hi_iso14443a.v"
 `include "hi_sniffer.v"
 `include "util.v"
-`include "hi_flite.v"
+// `include "hi_flite.v"
 `include "hi_get_trace.v"
 
-module fpga_felica(
+module fpga_hf_15(
     input spck, output miso, input mosi, input ncs,
     input pck0, input ck_1356meg, input ck_1356megb,
     output pwr_lo, output pwr_hi,
@@ -106,7 +109,8 @@ module fpga_felica(
 //-----------------------------------------------------------------------------
 
 /*
- Attempt to write up how its hooked up. Iceman 2020.
+ Attempt to write up how its hooked up.
+ / Iceman, 2020
 
  Communication between ARM / FPGA is done inside armsrc/fpgaloader.c see: function FpgaSendCommand()
  Send 16 bit command / data pair to FPGA
@@ -122,8 +126,9 @@ module fpga_felica(
 bit  |    15 14 13 12 11 10 9 8 7 6 5 4 3 2 1 0
 -----+-------------------------------------------
 cmd  |     x  x  x  x
-major|                          x x x
-opt  |                                    x x x
+major|                        x x x
+opt  |                                  x x x x
+sub  |                              x x
 divi |                          x x x x x x x x
 thres|                          x x x x x x x x
 -----+-------------------------------------------
@@ -186,6 +191,16 @@ hi_simulate hs(
     minor_mode
 );
 
+/*// 010 - HF ISO14443-A
+hi_iso14443a hisn(
+    ck_1356meg,
+    hisn_pwr_lo, hisn_pwr_hi, hisn_pwr_oe1, hisn_pwr_oe2, hisn_pwr_oe3, hisn_pwr_oe4,
+    adc_d, hisn_adc_clk,
+    hisn_ssp_frame, hisn_ssp_din, ssp_dout, hisn_ssp_clk,
+    hisn_dbg,
+    minor_mode
+);*/
+
 // 011 - HF sniff
 hi_sniffer he(
     ck_1356megb,
@@ -195,6 +210,7 @@ hi_sniffer he(
 );
 
 // 100 - HF ISO18092 FeliCa
+/*
 hi_flite hfl(
     ck_1356megb,
     hfl_pwr_lo, hfl_pwr_hi, hfl_pwr_oe1, hfl_pwr_oe2, hfl_pwr_oe3, hfl_pwr_oe4,
@@ -203,6 +219,7 @@ hi_flite hfl(
     hfl_dbg,
     minor_mode
 );
+*/
 
 // 101 - HF get trace
 hi_get_trace gt(
@@ -214,25 +231,25 @@ hi_get_trace gt(
 // Major modes:
 //   000 --  HF reader; subcarrier frequency and modulation depth selectable
 //   001 --  HF simulated tag
-//   010 --  HF ISO14443-A - removed for space...
+//   010 --  HF ISO14443-A
 //   011 --  HF sniff
 //   100 --  HF ISO18092 FeliCa
 //   101 --  HF get trace
 //   110 --  unused
 //   111 --  FPGA_MAJOR_MODE_OFF
 
-//                                         000           001           010     011           100            101           110   111
+//                                         000           001           010             011           100            101           110   111
 mux8 mux_ssp_clk   (major_mode, ssp_clk,   hr_ssp_clk,   hs_ssp_clk,   1'b0,   he_ssp_clk,   hfl_ssp_clk,   gt_ssp_clk,   1'b0, 1'b0);
 mux8 mux_ssp_din   (major_mode, ssp_din,   hr_ssp_din,   hs_ssp_din,   1'b0,   he_ssp_din,   hfl_ssp_din,   gt_ssp_din,   1'b0, 1'b0);
-mux8 mux_ssp_frame (major_mode, ssp_frame, hr_ssp_frame, hs_ssp_frame, 1'b0,   he_ssp_frame, hfl_ssp_frame, gt_ssp_frame, 1'b0, 1'b0);
+mux8 mux_ssp_frame (major_mode, ssp_frame, hr_ssp_frame, hs_ssp_frame, 1'b0, he_ssp_frame, hfl_ssp_frame, gt_ssp_frame,   1'b0, 1'b0);
 mux8 mux_pwr_oe1   (major_mode, pwr_oe1,   hr_pwr_oe1,   hs_pwr_oe1,   1'b0,   he_pwr_oe1,   hfl_pwr_oe1,   1'b0,         1'b0, 1'b0);
 mux8 mux_pwr_oe2   (major_mode, pwr_oe2,   hr_pwr_oe2,   hs_pwr_oe2,   1'b0,   he_pwr_oe2,   hfl_pwr_oe2,   1'b0,         1'b0, 1'b0);
 mux8 mux_pwr_oe3   (major_mode, pwr_oe3,   hr_pwr_oe3,   hs_pwr_oe3,   1'b0,   he_pwr_oe3,   hfl_pwr_oe3,   1'b0,         1'b0, 1'b0);
 mux8 mux_pwr_oe4   (major_mode, pwr_oe4,   hr_pwr_oe4,   hs_pwr_oe4,   1'b0,   he_pwr_oe4,   hfl_pwr_oe4,   1'b0,         1'b0, 1'b0);
-mux8 mux_pwr_lo    (major_mode, pwr_lo,    hr_pwr_lo,    hs_pwr_lo,    1'b0,   he_pwr_lo,    hfl_pwr_lo,    1'b0,         1'b0, 1'b0);
-mux8 mux_pwr_hi    (major_mode, pwr_hi,    hr_pwr_hi,    hs_pwr_hi,    1'b0,   he_pwr_hi,    hfl_pwr_hi,    1'b0,         1'b0, 1'b0);
+mux8 mux_pwr_lo    (major_mode, pwr_lo,    hr_pwr_lo,    hs_pwr_lo,    1'b0,    he_pwr_lo,    hfl_pwr_lo,    1'b0,        1'b0, 1'b0);
+mux8 mux_pwr_hi    (major_mode, pwr_hi,    hr_pwr_hi,    hs_pwr_hi,    1'b0,    he_pwr_hi,    hfl_pwr_hi,    1'b0,        1'b0, 1'b0);
 mux8 mux_adc_clk   (major_mode, adc_clk,   hr_adc_clk,   hs_adc_clk,   1'b0,   he_adc_clk,   hfl_adc_clk,   1'b0,         1'b0, 1'b0);
-mux8 mux_dbg       (major_mode, dbg,       hr_dbg,       hs_dbg,       1'b0,   he_dbg,       hfl_dbg,       1'b0,         1'b0, 1'b0);
+mux8 mux_dbg       (major_mode, dbg,       hr_dbg,       hs_dbg,       1'b0,       he_dbg,       hfl_dbg,       1'b0,         1'b0, 1'b0);
 
 // In all modes, let the ADC's outputs be enabled.
 assign adc_noe = 1'b0;

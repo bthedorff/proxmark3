@@ -16,7 +16,7 @@
 // modified to add support for iso15 2sc mode
 //
 
-module hi_reader(
+module hi_15_reader(
     ck_1356meg,
     pwr_lo, pwr_hi, pwr_oe1, pwr_oe2, pwr_oe3, pwr_oe4,
     adc_d, adc_clk,
@@ -87,7 +87,7 @@ reg [7:0] diff32 = 8'd0;
 reg [11:0] match16 = 12'd0;
 reg [11:0] match32 = 12'd0;
 reg [11:0] match28 = 12'd0;
-   
+
 always @(negedge adc_clk)
 begin
     if (corr_i_cnt[0] == 1'b0) // every 2 clock
@@ -116,7 +116,7 @@ begin
 
             avg128[127:8] = avg128[119:0];
             avg128[7:0] = avg;
-           
+
 
             if (corr_i_cnt[4:1] == 4'b0000) // every 32 clock (8*4)
             begin

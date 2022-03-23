@@ -252,11 +252,9 @@ void CodeIso15693AsTag(const uint8_t *cmd, size_t len) {
     ts->buf[++ts->max] = 0x1D;  // 00011101
 
     // data
-    for (size_t i = 0; i < len; i += 2) {
+    for (size_t i = 0; i < len; i ++) {
         ts->buf[++ts->max] = encode_4bits[cmd[i] & 0xF];
         ts->buf[++ts->max] = encode_4bits[cmd[i] >> 4];
-        ts->buf[++ts->max] = encode_4bits[cmd[i + 1] & 0xF];
-        ts->buf[++ts->max] = encode_4bits[cmd[i + 1] >> 4];
     }
 
     // EOF
@@ -398,13 +396,13 @@ typedef struct {
     } lastBit;
     uint16_t shiftReg;
     uint16_t max_len;
-    uint8_t *output;
-    int len;
+    uint16_t len;
     int sum1;
     int sum2;
     int threshold_sof;
     int threshold_half;
-    uint16_t  previous_amplitude;
+    uint16_t previous_amplitude;
+    uint8_t *output;
 } DecodeTag_t;
 
 //-----------------------------------------------------------------------------
@@ -454,7 +452,7 @@ static RAMFUNC int Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *ta
                 if (tag->posCount > 2) {
                     tag->threshold_half += amplitude; // keep track of average high value
                 }
-                if (tag->posCount == (recv_speed?10:40)) {
+                if (tag->posCount == (recv_speed ? 10 : 40)) {
                     tag->threshold_half >>= 2; // (4 times 1/2 average)
                     tag->state = STATE_TAG_SOF_HIGH_END;
                 }
@@ -468,7 +466,7 @@ static RAMFUNC int Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *ta
 
         case STATE_TAG_SOF_HIGH_END: {
             // check for falling edge
-            if (tag->posCount == (recv_speed?13:52) && amplitude < tag->threshold_sof) {
+            if (tag->posCount == (recv_speed ? 13 : 52) && amplitude < tag->threshold_sof) {
                 tag->lastBit = SOF_PART1;  // detected 1st part of SOF (12 samples low and 12 samples high)
                 tag->shiftReg = 0;
                 tag->bitCount = 0;
@@ -480,7 +478,7 @@ static RAMFUNC int Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *ta
                 LED_C_ON();
             } else {
                 tag->posCount++;
-                if (tag->posCount > (recv_speed?13:52)) { // high phase too long
+                if (tag->posCount > (recv_speed ? 13 : 52)) { // high phase too long
                     tag->posCount = 0;
                     tag->previous_amplitude = amplitude;
                     tag->state = STATE_TAG_SOF_LOW;
@@ -496,13 +494,13 @@ static RAMFUNC int Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *ta
                 tag->sum2 = 0;
             }
 
-            if (tag->posCount <= (recv_speed?4:16)) {
+            if (tag->posCount <= (recv_speed ? 4 : 16)) {
                 tag->sum1 += amplitude;
             } else {
                 tag->sum2 += amplitude;
             }
 
-            if (tag->posCount == (recv_speed?8:32)) {
+            if (tag->posCount == (recv_speed ? 8 : 32)) {
                 if (tag->sum1 > tag->threshold_half && tag->sum2 > tag->threshold_half) { // modulation in both halves
                     if (tag->lastBit == LOGIC0) {  // this was already part of EOF
                         tag->state = STATE_TAG_EOF;
@@ -583,13 +581,13 @@ static RAMFUNC int Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *ta
                 tag->sum2 = 0;
             }
 
-            if (tag->posCount <= (recv_speed?4:16)) {
+            if (tag->posCount <= (recv_speed ? 4 : 16)) {
                 tag->sum1 += amplitude;
             } else {
                 tag->sum2 += amplitude;
             }
 
-            if (tag->posCount == (recv_speed?8:32)) {
+            if (tag->posCount == (recv_speed ? 8 : 32)) {
                 if (tag->sum1 > tag->threshold_half && tag->sum2 < tag->threshold_half) { // modulation in first half
                     tag->posCount = 0;
                     tag->state = STATE_TAG_EOF_TAIL;
@@ -610,13 +608,13 @@ static RAMFUNC int Handle15693SamplesFromTag(uint16_t amplitude, DecodeTag_t *ta
                 tag->sum2 = 0;
             }
 
-            if (tag->posCount <= (recv_speed?4:16)) {
+            if (tag->posCount <= (recv_speed ? 4 : 16)) {
                 tag->sum1 += amplitude;
             } else {
                 tag->sum2 += amplitude;
             }
 
-            if (tag->posCount == (recv_speed?8:32)) {
+            if (tag->posCount == (recv_speed ? 8 : 32)) {
                 if (tag->sum1 < tag->threshold_half && tag->sum2 < tag->threshold_half) { // no modulation in both halves
                     LED_C_OFF();
                     return true;
@@ -666,145 +664,131 @@ static void DecodeTagInit(DecodeTag_t *tag, uint8_t *data, uint16_t max_len) {
 #define MAX_COUNT(c, s)   ((s) ? (c >= 13) : (c >= 52))
 
 typedef struct DecodeTagFSK {
-	enum {
+    enum {
         STATE_FSK_ERROR,
-		STATE_FSK_BEFORE_SOF,
-		STATE_FSK_SOF_484,
-		STATE_FSK_SOF_424,
-		STATE_FSK_SOF_END_484,
+        STATE_FSK_BEFORE_SOF,
+        STATE_FSK_SOF_484,
+        STATE_FSK_SOF_424,
+        STATE_FSK_SOF_END_484,
         STATE_FSK_SOF_END_424,
-		STATE_FSK_RECEIVING_DATA_484,
-		STATE_FSK_RECEIVING_DATA_424,
-		STATE_FSK_EOF
-	}        state;
-	enum {
-		LOGIC0_PART1,
-		LOGIC1_PART1,
-		LOGIC0_PART2,
-		LOGIC1_PART2,
+        STATE_FSK_RECEIVING_DATA_484,
+        STATE_FSK_RECEIVING_DATA_424,
+        STATE_FSK_EOF
+    }        state;
+    enum {
+        LOGIC0_PART1,
+        LOGIC1_PART1,
+        LOGIC0_PART2,
+        LOGIC1_PART2,
         SOF
-	}        lastBit;
-	uint8_t  count;
-	uint8_t  bitCount;
-	uint8_t  shiftReg;
-	uint16_t len;
-	uint16_t max_len;
-	uint8_t  *output;
+    }        lastBit;
+    uint8_t  count;
+    uint8_t  bitCount;
+    uint8_t  shiftReg;
+    uint16_t len;
+    uint16_t max_len;
+    uint8_t  *output;
 } DecodeTagFSK_t;
 
 static void DecodeTagFSKReset(DecodeTagFSK_t *DecodeTag) {
-	DecodeTag->state = STATE_FSK_BEFORE_SOF;
-	DecodeTag->bitCount = 0;
-	DecodeTag->len = 0;
-	DecodeTag->shiftReg = 0;
+    DecodeTag->state = STATE_FSK_BEFORE_SOF;
+    DecodeTag->bitCount = 0;
+    DecodeTag->len = 0;
+    DecodeTag->shiftReg = 0;
 }
 
 static void DecodeTagFSKInit(DecodeTagFSK_t *DecodeTag, uint8_t *data, uint16_t max_len) {
-	DecodeTag->output = data;
-	DecodeTag->max_len = max_len;
-	DecodeTagFSKReset(DecodeTag);
+    DecodeTag->output = data;
+    DecodeTag->max_len = max_len;
+    DecodeTagFSKReset(DecodeTag);
 }
 
 // Performances of this function are crutial for stability
 // as it is called in real time for every samples
-static int RAMFUNC Handle15693FSKSamplesFromTag(uint8_t freq, DecodeTagFSK_t *DecodeTag, bool recv_speed)
-{
-	switch(DecodeTag->state) {
-		case STATE_FSK_BEFORE_SOF:
-			if (FREQ_IS_484(freq))
-			{ // possible SOF starting
-				DecodeTag->state = STATE_FSK_SOF_484;
-				DecodeTag->lastBit = LOGIC0_PART1;
-				DecodeTag->count = 1;
-			}
-			break;
+static int RAMFUNC Handle15693FSKSamplesFromTag(uint8_t freq, DecodeTagFSK_t *DecodeTag, bool recv_speed) {
+    switch (DecodeTag->state) {
+        case STATE_FSK_BEFORE_SOF:
+            if (FREQ_IS_484(freq)) {
+                // possible SOF starting
+                DecodeTag->state = STATE_FSK_SOF_484;
+                DecodeTag->lastBit = LOGIC0_PART1;
+                DecodeTag->count = 1;
+            }
+            break;
 
-		case STATE_FSK_SOF_484:
+        case STATE_FSK_SOF_484:
             //DbpString("STATE_FSK_SOF_484");
-			if (FREQ_IS_424(freq) && SEOF_COUNT(DecodeTag->count, recv_speed))
-			{ // SOF part1 continue at 424
-				DecodeTag->state = STATE_FSK_SOF_424;
-				DecodeTag->count = 1;
-			}
-            else if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still in SOF at 484
-            {
-				DecodeTag->count++;
+            if (FREQ_IS_424(freq) && SEOF_COUNT(DecodeTag->count, recv_speed)) {
+                // SOF part1 continue at 424
+                DecodeTag->state = STATE_FSK_SOF_424;
+                DecodeTag->count = 1;
+            } else if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) { // still in SOF at 484
+                DecodeTag->count++;
+            } else { // SOF failed, roll back
+                DecodeTag->state = STATE_FSK_BEFORE_SOF;
             }
-			else // SOF failed, roll back
-            {
-				DecodeTag->state = STATE_FSK_BEFORE_SOF;
-            }
-			break;
+            break;
 
-		case STATE_FSK_SOF_424:
+        case STATE_FSK_SOF_424:
             //DbpString("STATE_FSK_SOF_424");
-            if (FREQ_IS_484(freq) && SEOF_COUNT(DecodeTag->count, recv_speed))
-			{ // SOF part 1 finished
-				DecodeTag->state = STATE_FSK_SOF_END_484;
-				DecodeTag->count = 1;
-			}
-			else if (FREQ_IS_424(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still in SOF at 424
-				DecodeTag->count++;
-			else // SOF failed, roll back
-            {
+            if (FREQ_IS_484(freq) && SEOF_COUNT(DecodeTag->count, recv_speed)) {
+                // SOF part 1 finished
+                DecodeTag->state = STATE_FSK_SOF_END_484;
+                DecodeTag->count = 1;
+            } else if (FREQ_IS_424(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still in SOF at 424
+                DecodeTag->count++;
+            else { // SOF failed, roll back
 #ifdef DEBUG
                 if (DEBUG)
                     Dbprintf("SOF_424 failed: freq=%d, count=%d, recv_speed=%d", freq, DecodeTag->count, recv_speed);
 #endif
-				DecodeTag->state = STATE_FSK_BEFORE_SOF;
+                DecodeTag->state = STATE_FSK_BEFORE_SOF;
             }
-			break;
+            break;
 
-		case STATE_FSK_SOF_END_484:
-            if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed))
-			{
+        case STATE_FSK_SOF_END_484:
+            if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed)) {
                 DecodeTag->state = STATE_FSK_SOF_END_424;
-				DecodeTag->count = 1;
-			}
-            else if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still in SOF_END_484
-				DecodeTag->count++;
-            else // SOF failed, roll back
-            {
+                DecodeTag->count = 1;
+            } else if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still in SOF_END_484
+                DecodeTag->count++;
+            else { // SOF failed, roll back
 #ifdef DEBUG
                 if (DEBUG)
                     Dbprintf("SOF_END_484 failed: freq=%d, count=%d, recv_speed=%d", freq, DecodeTag->count, recv_speed);
 #endif
-				DecodeTag->state = STATE_FSK_BEFORE_SOF;
+                DecodeTag->state = STATE_FSK_BEFORE_SOF;
             }
-			break;
+            break;
         case STATE_FSK_SOF_END_424:
-            if (FREQ_IS_484(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed))
-			{ // SOF finished at 484
-				DecodeTag->count = 1;
+            if (FREQ_IS_484(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed)) {
+                // SOF finished at 484
+                DecodeTag->count = 1;
                 DecodeTag->lastBit = SOF;
-				DecodeTag->state = STATE_FSK_RECEIVING_DATA_484;
+                DecodeTag->state = STATE_FSK_RECEIVING_DATA_484;
                 LED_C_ON();
-			}
-			else if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count-2, recv_speed))
-			{ // SOF finished at 424 (wait count+2 to be sure that next freq is 424)
-				DecodeTag->count = 2;
+            } else if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count - 2, recv_speed)) {
+                // SOF finished at 424 (wait count+2 to be sure that next freq is 424)
+                DecodeTag->count = 2;
                 DecodeTag->lastBit = SOF;
                 DecodeTag->state = STATE_FSK_RECEIVING_DATA_424;
                 LED_C_ON();
-			}
-			else if (FREQ_IS_424(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still in SOF_END_424
+            } else if (FREQ_IS_424(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still in SOF_END_424
                 DecodeTag->count++;
-			else // SOF failed, roll back
-            {
+            else { // SOF failed, roll back
 #ifdef DEBUG
                 if (DEBUG)
                     Dbprintf("SOF_END_424 failed: freq=%d, count=%d, recv_speed=%d", freq, DecodeTag->count, recv_speed);
 #endif
-				DecodeTag->state = STATE_FSK_BEFORE_SOF;
+                DecodeTag->state = STATE_FSK_BEFORE_SOF;
             }
             break;
 
 
-		case STATE_FSK_RECEIVING_DATA_424:
-            if (FREQ_IS_484(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed))
-			{
-                if (DecodeTag->lastBit == LOGIC1_PART1)
-                { // logic 1 finished, goto 484
+        case STATE_FSK_RECEIVING_DATA_424:
+            if (FREQ_IS_484(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed)) {
+                if (DecodeTag->lastBit == LOGIC1_PART1) {
+                    // logic 1 finished, goto 484
                     DecodeTag->lastBit = LOGIC1_PART2;
 
                     DecodeTag->shiftReg >>= 1;
@@ -820,17 +804,15 @@ static int RAMFUNC Handle15693FSKSamplesFromTag(uint8_t freq, DecodeTagFSK_t *De
                         DecodeTag->bitCount = 0;
                         DecodeTag->shiftReg = 0;
                     }
-                }
-                else
-                { // end of LOGIC0_PART1
+                } else {
+                    // end of LOGIC0_PART1
                     DecodeTag->lastBit = LOGIC0_PART1;
                 }
                 DecodeTag->count = 1;
                 DecodeTag->state = STATE_FSK_RECEIVING_DATA_484;
-            }
-            else if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count-2, recv_speed) &&
-                     DecodeTag->lastBit == LOGIC1_PART1)
-			{ // logic 1 finished, stay in 484
+            } else if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count - 2, recv_speed) &&
+                       DecodeTag->lastBit == LOGIC1_PART1) {
+                // logic 1 finished, stay in 484
                 DecodeTag->lastBit = LOGIC1_PART2;
 
                 DecodeTag->shiftReg >>= 1;
@@ -846,39 +828,35 @@ static int RAMFUNC Handle15693FSKSamplesFromTag(uint8_t freq, DecodeTagFSK_t *De
                     DecodeTag->bitCount = 0;
                     DecodeTag->shiftReg = 0;
                 }
-				DecodeTag->count = 2;
- 			}
-            else if (FREQ_IS_424(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still at 424
-				DecodeTag->count++;
+                DecodeTag->count = 2;
+            } else if (FREQ_IS_424(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still at 424
+                DecodeTag->count++;
 
-			else if (FREQ_IS_484(freq) && DecodeTag->lastBit == LOGIC0_PART2 &&
-					 SEOF_COUNT(DecodeTag->count, recv_speed))
-			{ // EOF has started
+            else if (FREQ_IS_484(freq) && DecodeTag->lastBit == LOGIC0_PART2 &&
+                     SEOF_COUNT(DecodeTag->count, recv_speed)) {
+                // EOF has started
 #ifdef DEBUG
                 if (DEBUG)
                     Dbprintf("RECEIVING_DATA_424->EOF: freq=%d, count=%d, recv_speed=%d, lastbit=%d, state=%d", freq, DecodeTag->count, recv_speed, DecodeTag->lastBit, DecodeTag->state);
 #endif
-				DecodeTag->count = 1;
-				DecodeTag->state = STATE_FSK_EOF;
-				LED_C_OFF();
-			}
-			else // error
-			{
+                DecodeTag->count = 1;
+                DecodeTag->state = STATE_FSK_EOF;
+                LED_C_OFF();
+            } else { // error
 #ifdef DEBUG
                 if (DEBUG)
                     Dbprintf("RECEIVING_DATA_424 error: freq=%d, count=%d, recv_speed=%d, lastbit=%d, state=%d", freq, DecodeTag->count, recv_speed, DecodeTag->lastBit, DecodeTag->state);
 #endif
-				DecodeTag->state = STATE_FSK_ERROR;
-				LED_C_OFF();
-				return true;
-			}
-			break;
+                DecodeTag->state = STATE_FSK_ERROR;
+                LED_C_OFF();
+                return true;
+            }
+            break;
 
-		case STATE_FSK_RECEIVING_DATA_484:
-			if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed))
-			{
-                if (DecodeTag->lastBit == LOGIC0_PART1)
-                { // logic 0 finished, goto 424
+        case STATE_FSK_RECEIVING_DATA_484:
+            if (FREQ_IS_424(freq) && LOGIC_COUNT(DecodeTag->count, recv_speed)) {
+                if (DecodeTag->lastBit == LOGIC0_PART1) {
+                    // logic 0 finished, goto 424
                     DecodeTag->lastBit = LOGIC0_PART2;
 
                     DecodeTag->shiftReg >>= 1;
@@ -893,17 +871,15 @@ static int RAMFUNC Handle15693FSKSamplesFromTag(uint8_t freq, DecodeTagFSK_t *De
                         DecodeTag->bitCount = 0;
                         DecodeTag->shiftReg = 0;
                     }
-                }
-                else
-                { // end of LOGIC1_PART1
+                } else {
+                    // end of LOGIC1_PART1
                     DecodeTag->lastBit = LOGIC1_PART1;
                 }
                 DecodeTag->count = 1;
                 DecodeTag->state = STATE_FSK_RECEIVING_DATA_424;
-            }
-			else if (FREQ_IS_484(freq) && LOGIC_COUNT(DecodeTag->count-2, recv_speed) &&
-                     DecodeTag->lastBit == LOGIC0_PART1)
-			{ // logic 0 finished, stay in 424
+            } else if (FREQ_IS_484(freq) && LOGIC_COUNT(DecodeTag->count - 2, recv_speed) &&
+                       DecodeTag->lastBit == LOGIC0_PART1) {
+                // logic 0 finished, stay in 424
                 DecodeTag->lastBit = LOGIC0_PART2;
 
                 DecodeTag->shiftReg >>= 1;
@@ -918,58 +894,55 @@ static int RAMFUNC Handle15693FSKSamplesFromTag(uint8_t freq, DecodeTagFSK_t *De
                     DecodeTag->bitCount = 0;
                     DecodeTag->shiftReg = 0;
                 }
-				DecodeTag->count = 2;
- 			}
-			else if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still at 484
-				DecodeTag->count++;
-            else // error
-			{
+                DecodeTag->count = 2;
+            } else if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still at 484
+                DecodeTag->count++;
+            else { // error
 #ifdef DEBUG
                 if (DEBUG)
                     Dbprintf("RECEIVING_DATA_484 error: freq=%d, count=%d, recv_speed=%d, lastbit=%d, state=%d", freq, DecodeTag->count, recv_speed, DecodeTag->lastBit, DecodeTag->state);
 #endif
-				LED_C_OFF();
-				DecodeTag->state = STATE_FSK_ERROR;
-				return true;
-			}
-			break;
+                LED_C_OFF();
+                DecodeTag->state = STATE_FSK_ERROR;
+                return true;
+            }
+            break;
 
-		case STATE_FSK_EOF:
-			if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) // still at 484
-			{
-				DecodeTag->count++;
-				if (SEOF_COUNT(DecodeTag->count, recv_speed))
-					return true; // end of the transmission
-			}
-			else // error
-			{
+        case STATE_FSK_EOF:
+            if (FREQ_IS_484(freq) && !MAX_COUNT(DecodeTag->count, recv_speed)) { // still at 484
+                DecodeTag->count++;
+                if (SEOF_COUNT(DecodeTag->count, recv_speed))
+                    return true; // end of the transmission
+            } else { // error
 #ifdef DEBUG
                 if (DEBUG)
                     Dbprintf("EOF error: freq=%d, count=%d, recv_speed=%d", freq, DecodeTag->count, recv_speed);
 #endif
-				DecodeTag->state = STATE_FSK_ERROR;
-				return true;
-			}
-			break;
-		case STATE_FSK_ERROR:
-			LED_C_OFF();
+                DecodeTag->state = STATE_FSK_ERROR;
+                return true;
+            }
+            break;
+        case STATE_FSK_ERROR:
+            LED_C_OFF();
 #ifdef DEBUG
             if (DEBUG)
-                    Dbprintf("FSK error: freq=%d, count=%d, recv_speed=%d", freq, DecodeTag->count, recv_speed);
+                Dbprintf("FSK error: freq=%d, count=%d, recv_speed=%d", freq, DecodeTag->count, recv_speed);
 #endif
-			return true; // error
-			break;
-	}
-	return false;
+            return true; // error
+            break;
+    }
+    return false;
 }
 
 /*
  *  Receive and decode the tag response, also log to tracebuffer
  */
-int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeout, uint32_t *eof_time, bool fsk, bool recv_speed) {
+int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeout, uint32_t *eof_time, bool fsk, bool recv_speed, uint16_t *resp_len) {
 
-    int samples = 0, ret = 0;
-
+    int samples = 0, ret = PM3_SUCCESS;
+    if (resp_len) {
+        *resp_len = 0;
+    }
     // the Decoder data structure
     DecodeTag_t dtm = { 0 };
     DecodeTag_t *dt = &dtm;
@@ -977,10 +950,10 @@ int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeo
     DecodeTagFSK_t dtfm = { 0 };
     DecodeTagFSK_t *dtf = &dtfm;
 
-    if (!fsk)
-        DecodeTagInit(dt, response, max_len);
-    else
+    if (fsk)
         DecodeTagFSKInit(dtf, response, max_len);
+    else
+        DecodeTagInit(dt, response, max_len);
 
     // wait for last transfer to complete
     while (!(AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXEMPTY));
@@ -997,7 +970,7 @@ int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeo
     // Setup and start DMA.
     if (FpgaSetupSscDma((uint8_t *) dma->buf, DMA_BUFFER_SIZE) == false) {
         if (g_dbglevel > DBG_ERROR) Dbprintf("FpgaSetupSscDma failed. Exiting");
-        return -4;
+        return PM3_EINIT;
     }
 
     uint32_t dma_start_time = 0;
@@ -1036,34 +1009,13 @@ int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeo
 
                 WDT_HIT();
                 if (BUTTON_PRESS()) {
-                    DbpString("stopped");
                     break;
                 }
             }
         }
 
-        if (!fsk) {
-            if (Handle15693SamplesFromTag(tagdata & 0x3FFF, dt, recv_speed)) {
+        if (fsk) {
 
-                *eof_time = dma_start_time + (samples * 16) - DELAY_TAG_TO_ARM; // end of EOF
-
-                if (dt->lastBit == SOF_PART2) {
-                    *eof_time -= (8 * 16); // needed 8 additional samples to confirm single SOF (iCLASS)
-                }
-                if (dt->len > dt->max_len) {
-                    ret = -2; // buffer overflow
-                    Dbprintf("overflow (%d > %d", dt->len, dt->max_len);
-                }
-                break;
-            }
-
-            // timeout
-            if (samples > timeout && dt->state < STATE_TAG_RECEIVING_DATA) {
-                ret = -3;
-                break;
-            }
-        }
-        else {
             if (Handle15693FSKSamplesFromTag(tagdata >> 14, dtf, recv_speed)) {
 
                 *eof_time = dma_start_time + (samples * 16) - DELAY_TAG_TO_ARM; // end of EOF
@@ -1071,8 +1023,9 @@ int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeo
                 if (dtf->lastBit == SOF) {
                     *eof_time -= (8 * 16); // needed 8 additional samples to confirm single SOF (iCLASS)
                 }
+
                 if (dtf->len > dtf->max_len) {
-                    ret = -2; // buffer overflow
+                    ret = PM3_EOVFLOW;
                     Dbprintf("overflow (%d > %d", dtf->len, dtf->max_len);
                 }
                 break;
@@ -1080,7 +1033,30 @@ int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeo
 
             // timeout
             if (samples > timeout && dtf->state < STATE_FSK_RECEIVING_DATA_484) {
-                ret = -3;
+                ret = PM3_ETIMEOUT;
+                break;
+            }
+
+        } else {
+
+            if (Handle15693SamplesFromTag(tagdata & 0x3FFF, dt, recv_speed)) {
+
+                *eof_time = dma_start_time + (samples * 16) - DELAY_TAG_TO_ARM; // end of EOF
+
+                if (dt->lastBit == SOF_PART2) {
+                    *eof_time -= (8 * 16); // needed 8 additional samples to confirm single SOF (iCLASS)
+                }
+
+                if (dt->len > dt->max_len) {
+                    ret = PM3_EOVFLOW;
+                    Dbprintf("overflow (%d > %d", dt->len, dt->max_len);
+                }
+                break;
+            }
+
+            // timeout
+            if (samples > timeout && dt->state < STATE_TAG_RECEIVING_DATA) {
+                ret = PM3_ETIMEOUT;
                 break;
             }
         }
@@ -1091,25 +1067,7 @@ int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeo
 
     uint32_t sof_time = *eof_time - (32 * 16);  // time for SOF transfer
 
-    if (!fsk) {
-        sof_time -= (dt->len * 8 * 8 * 16) // time for byte transfers
-                    + (dt->lastBit != SOF_PART2 ? (32 * 16) : 0); // time for EOF transfer
-
-        if (g_dbglevel >= DBG_EXTENDED) {
-            Dbprintf("samples = %d, ret = %d, Decoder: state = %d, lastBit = %d, len = %d, bitCount = %d, posCount = %d, maxlen = %u",
-                     samples,
-                     ret,
-                     dt->state,
-                     dt->lastBit,
-                     dt->len,
-                     dt->bitCount,
-                     dt->posCount,
-                     dt->max_len
-                );
-            Dbprintf("timing: sof_time = %d, eof_time = %d", (sof_time * 4), (*eof_time * 4));
-        }
-    }
-    else {
+    if (fsk) {
         sof_time -= (dtf->len * 8 * 8 * 16) // time for byte transfers
                     + (dtf->lastBit != SOF ? (32 * 16) : 0); // time for EOF transfer
 
@@ -1123,21 +1081,41 @@ int GetIso15693AnswerFromTag(uint8_t *response, uint16_t max_len, uint16_t timeo
                      dtf->bitCount,
                      dtf->count,
                      dtf->max_len
-                );
+                    );
+            Dbprintf("timing: sof_time = %d, eof_time = %d", (sof_time * 4), (*eof_time * 4));
+        }
+    } else {
+        sof_time -= (dt->len * 8 * 8 * 16) // time for byte transfers
+                    + (dt->lastBit != SOF_PART2 ? (32 * 16) : 0); // time for EOF transfer
+
+        if (g_dbglevel >= DBG_EXTENDED) {
+            Dbprintf("samples = %d, ret = %d, Decoder: state = %d, lastBit = %d, len = %d, bitCount = %d, posCount = %d, maxlen = %u",
+                     samples,
+                     ret,
+                     dt->state,
+                     dt->lastBit,
+                     dt->len,
+                     dt->bitCount,
+                     dt->posCount,
+                     dt->max_len
+                    );
             Dbprintf("timing: sof_time = %d, eof_time = %d", (sof_time * 4), (*eof_time * 4));
         }
     }
 
-    if (ret < 0) {
+    if (ret != PM3_SUCCESS) {
+        *resp_len = 0;
         return ret;
     }
 
-    if (!fsk) {
+    if (fsk) {
+        LogTrace_ISO15693(dtf->output, dtf->len, (sof_time * 4), (*eof_time * 4), NULL, false);
+        *resp_len = dtf->len;
+    } else {
         LogTrace_ISO15693(dt->output, dt->len, (sof_time * 4), (*eof_time * 4), NULL, false);
-        return dt->len;
+        *resp_len = dt->len;
     }
-    LogTrace_ISO15693(dtf->output, dtf->len, (sof_time * 4), (*eof_time * 4), NULL, false);
-    return dtf->len;
+    return PM3_SUCCESS;
 }
 
 
@@ -1635,7 +1613,7 @@ void SniffIso15693(uint8_t jam_search_len, uint8_t *jam_search_string, bool icla
 
     FpgaDownloadAndGo(FPGA_BITSTREAM_HF_15);
 
-    DbpString("Starting to sniff. Press PM3 Button to stop.");
+    DbpString("Starting to sniff. Press <PM3 button> to stop");
 
     BigBuf_free();
     clear_trace();
@@ -1647,7 +1625,7 @@ void SniffIso15693(uint8_t jam_search_len, uint8_t *jam_search_string, bool icla
 
     DecodeTagFSK_t dtagfsk = {0};
     uint8_t response2[ISO15693_MAX_RESPONSE_LENGTH] = {0};
-	DecodeTagFSKInit(&dtagfsk, response2, sizeof(response2));
+    DecodeTagFSKInit(&dtagfsk, response2, sizeof(response2));
 
     DecodeReader_t dreader = {0};
     uint8_t cmd[ISO15693_MAX_COMMAND_LENGTH] = {0};
@@ -1721,7 +1699,6 @@ void SniffIso15693(uint8_t jam_search_len, uint8_t *jam_search_string, bool icla
 
                 WDT_HIT();
                 if (BUTTON_PRESS()) {
-                    DbpString("Sniff stopped");
                     break;
                 }
             }
@@ -1740,8 +1717,7 @@ void SniffIso15693(uint8_t jam_search_len, uint8_t *jam_search_string, bool icla
                                         - 16 * 16; // time for EOF transfer
                     LogTrace_ISO15693(dreader.output, dreader.byteCount, (sof_time * 4), (eof_time * 4), NULL, true);
 
-                    if (!iclass) // Those flags don't exist in iClass
-                    {
+                    if (!iclass) { // Those flags don't exist in iClass
                         expect_fsk_answer = dreader.output[0] & ISO15_REQ_SUBCARRIER_TWO;
                         expect_fast_answer = dreader.output[0] & ISO15_REQ_DATARATE_HIGH;
                     }
@@ -1761,8 +1737,7 @@ void SniffIso15693(uint8_t jam_search_len, uint8_t *jam_search_string, bool icla
                                         - 32 * 16  // time for SOF transfer
                                         - 16 * 16; // time for EOF transfer
                     LogTrace_ISO15693(dreader.output, dreader.byteCount, (sof_time * 4), (eof_time * 4), NULL, true);
-                    if (!iclass) // Those flags don't exist in iClass
-                    {
+                    if (!iclass) { // Those flags don't exist in iClass
                         expect_fsk_answer = dreader.output[0] & ISO15_REQ_SUBCARRIER_TWO;
                         expect_fast_answer = dreader.output[0] & ISO15_REQ_DATARATE_HIGH;
                     }
@@ -1780,8 +1755,7 @@ void SniffIso15693(uint8_t jam_search_len, uint8_t *jam_search_string, bool icla
 
         if (!reader_is_active && expect_tag_answer) {                       // no need to try decoding tag data if the reader is currently sending or no answer expected yet
 
-            if (!expect_fsk_answer)
-            {
+            if (!expect_fsk_answer) {
                 if (Handle15693SamplesFromTag((sniffdata >> 4) << 2, &dtag, expect_fast_answer)) {
 
                     uint32_t eof_time = dma_start_time + (samples * 16) - DELAY_TAG_TO_ARM_SNIFF; // end of EOF
@@ -1803,30 +1777,26 @@ void SniffIso15693(uint8_t jam_search_len, uint8_t *jam_search_string, bool icla
                 } else {
                     tag_is_active = (dtag.state >= STATE_TAG_RECEIVING_DATA);
                 }
-            }
-            else
-            {
+            } else {
                 if (FREQ_IS_0((sniffdata >> 2) & 0x3)) // tolerate 1 00
                     sniffdata = sniffdata_prev;
 
                 if (Handle15693FSKSamplesFromTag((sniffdata >> 2) & 0x3, &dtagfsk, expect_fast_answer)) {
                     expect_fsk_answer = false;
-                }
-                else {
+                } else {
                     tag_is_active = (dtagfsk.state >= STATE_FSK_RECEIVING_DATA_484);
                 }
-                if (!expect_fsk_answer)
-                { // FSK answer no more expected: switch back to ASK
-                    if (dtagfsk.len > 0)
-                    {
+                if (!expect_fsk_answer) {
+                    // FSK answer no more expected: switch back to ASK
+                    if (dtagfsk.len > 0) {
                         uint32_t eof_time = dma_start_time + (samples * 16) - DELAY_TAG_TO_ARM_SNIFF; // end of EOF
                         if (dtagfsk.lastBit == SOF) {
                             eof_time -= (8 * 16); // needed 8 additional samples to confirm single SOF (iCLASS)
                         }
                         uint32_t sof_time = eof_time
-                            - dtagfsk.len * 8 * 8 * 16 // time for byte transfers
-                            - (32 * 16)  // time for SOF transfer
-                            - (dtagfsk.lastBit != SOF ? (32 * 16) : 0); // time for EOF transfer
+                                            - dtagfsk.len * 8 * 8 * 16 // time for byte transfers
+                                            - (32 * 16)  // time for SOF transfer
+                                            - (dtagfsk.lastBit != SOF ? (32 * 16) : 0); // time for EOF transfer
 
                         LogTrace_ISO15693(dtagfsk.output, dtagfsk.len, (sof_time * 4), (eof_time * 4), NULL, false);
                     }
@@ -1914,15 +1884,12 @@ static void BuildIdentifyRequest(uint8_t *cmd) {
 //  return: length of received data
 // logging enabled
 int SendDataTag(uint8_t *send, int sendlen, bool init, bool speed_fast, uint8_t *recv,
-                uint16_t max_recv_len, uint32_t start_time, uint16_t timeout, uint32_t *eof_time) {
+                uint16_t max_recv_len, uint32_t start_time, uint16_t timeout, uint32_t *eof_time, uint16_t *resp_len) {
 
     if (init) {
         Iso15693InitReader();
         start_time = GetCountSspClk();
     }
-
-    bool fsk = send[0] & ISO15_REQ_SUBCARRIER_TWO;
-	bool recv_speed = send[0] & ISO15_REQ_DATARATE_HIGH;
 
     if (speed_fast) {
         // high speed (1 out of 4)
@@ -1931,26 +1898,28 @@ int SendDataTag(uint8_t *send, int sendlen, bool init, bool speed_fast, uint8_t 
         // low speed (1 out of 256)
         CodeIso15693AsReader256(send, sendlen);
     }
-    int res = 0;
+
     tosend_t *ts = get_tosend();
     TransmitTo15693Tag(ts->buf, ts->max, &start_time);
 
     if (tearoff_hook() == PM3_ETEAROFF) { // tearoff occurred
-
-        res = PM3_ETEAROFF;
-
+        *resp_len = 0;
+        return PM3_ETEAROFF;
     } else {
 
+        int res = PM3_SUCCESS;
         *eof_time = start_time + 32 * ((8 * ts->max) - 4); // subtract the 4 padding bits after EOF
         LogTrace_ISO15693(send, sendlen, (start_time * 4), (*eof_time * 4), NULL, true);
         if (recv != NULL) {
-            res = GetIso15693AnswerFromTag(recv, max_recv_len, timeout, eof_time, fsk, recv_speed);
+            bool fsk = send[0] & ISO15_REQ_SUBCARRIER_TWO;
+            bool recv_speed = send[0] & ISO15_REQ_DATARATE_HIGH;
+            res = GetIso15693AnswerFromTag(recv, max_recv_len, timeout, eof_time, fsk, recv_speed, resp_len);
         }
+        return res;
     }
-    return res;
 }
 
-int SendDataTagEOF(uint8_t *recv, uint16_t max_recv_len, uint32_t start_time, uint16_t timeout, uint32_t *eof_time, bool fsk, bool recv_speed) {
+int SendDataTagEOF(uint8_t *recv, uint16_t max_recv_len, uint32_t start_time, uint16_t timeout, uint32_t *eof_time, bool fsk, bool recv_speed, uint16_t *resp_len) {
 
     CodeIso15693AsReaderEOF();
     tosend_t *ts = get_tosend();
@@ -1958,9 +1927,9 @@ int SendDataTagEOF(uint8_t *recv, uint16_t max_recv_len, uint32_t start_time, ui
     uint32_t end_time = start_time + 32 * (8 * ts->max - 4); // subtract the 4 padding bits after EOF
     LogTrace_ISO15693(NULL, 0, (start_time * 4), (end_time * 4), NULL, true);
 
-    int res = 0;
-    if (recv != NULL) {
-        res = GetIso15693AnswerFromTag(recv, max_recv_len, timeout, eof_time, fsk, recv_speed);
+    int res = PM3_SUCCESS;
+    if (recv) {
+        res = GetIso15693AnswerFromTag(recv, max_recv_len, timeout, eof_time, fsk, recv_speed, resp_len);
     }
     return res;
 }
@@ -2036,9 +2005,7 @@ static void DbdecodeIso15693Answer(int len, uint8_t *d) {
 // Act as ISO15693 reader, perform anti-collision and then attempt to read a sector
 // all demodulation performed in arm rather than host. - greg
 //-----------------------------------------------------------------------------
-// ok
-// parameter is unused !?!
-void ReaderIso15693(uint32_t parameter, iso15_card_select_t *p_card) {
+void ReaderIso15693(iso15_card_select_t *p_card) {
 
     LED_A_ON();
     set_tracing(true);
@@ -2054,10 +2021,11 @@ void ReaderIso15693(uint32_t parameter, iso15_card_select_t *p_card) {
     BuildIdentifyRequest(cmd);
     uint32_t start_time = 0;
     uint32_t eof_time;
-    int recvlen = SendDataTag(cmd, sizeof(cmd), true, true, answer, ISO15693_MAX_RESPONSE_LENGTH, start_time, ISO15693_READER_TIMEOUT, &eof_time);
+    uint16_t recvlen = 0;
+    int res = SendDataTag(cmd, sizeof(cmd), true, true, answer, ISO15693_MAX_RESPONSE_LENGTH, start_time, ISO15693_READER_TIMEOUT, &eof_time, &recvlen);
 
-    if (recvlen == PM3_ETEAROFF) { // tearoff occurred
-        reply_mix(CMD_ACK, recvlen, 0, 0, NULL, 0);
+    if (res == PM3_ETEAROFF) { // tearoff occurred
+        reply_ng(CMD_HF_ISO15693_READER, res, NULL, 0);
     } else {
 
         //start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
@@ -2090,7 +2058,7 @@ void ReaderIso15693(uint32_t parameter, iso15_card_select_t *p_card) {
             // arg1 = len of response (12 bytes)
             // arg2 = rtf
             // asbytes = uid.
-            reply_mix(CMD_ACK, 1, sizeof(uid), 0, uid, sizeof(uid));
+            reply_ng(CMD_HF_ISO15693_READER, PM3_SUCCESS, uid, sizeof(uid));
 
             if (g_dbglevel >= DBG_EXTENDED) {
                 Dbprintf("[+] %d octets read from IDENTIFY request:", recvlen);
@@ -2100,7 +2068,7 @@ void ReaderIso15693(uint32_t parameter, iso15_card_select_t *p_card) {
         } else {
             p_card->uidlen = 0;
             DbpString("Failed to select card");
-            reply_mix(CMD_ACK, 0, 0, 0, NULL, 0);
+            reply_ng(CMD_HF_ISO15693_READER, PM3_EFAILED, NULL, 0);
         }
     }
     switch_off();
@@ -2304,18 +2272,20 @@ void BruteforceIso15693Afi(uint32_t speed) {
 
     int datalen = 5;
     uint32_t eof_time = 0;
-    int recvlen = SendDataTag(data, datalen, true, speed, recv, sizeof(recv), 0, ISO15693_READER_TIMEOUT, &eof_time);
-    uint32_t start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
+    uint16_t recvlen = 0;
+    int res = SendDataTag(data, datalen, true, speed, recv, sizeof(recv), 0, ISO15693_READER_TIMEOUT, &eof_time, &recvlen);
+    if (res != PM3_SUCCESS) {
+        DbpString("Failed to select card");
+        reply_ng(CMD_HF_ISO15693_FINDAFI, res, NULL, 0);
+        switch_off();
+        return;
+    }
 
+    uint32_t start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
     WDT_HIT();
 
     if (recvlen >= 12) {
         Dbprintf("NoAFI UID = %s", iso15693_sprintUID(NULL, recv + 2));
-    } else {
-        DbpString("Failed to select card");
-        reply_ng(CMD_HF_ISO15693_FINDAFI, PM3_ESOFT, NULL, 0);
-        switch_off();
-        return;
     }
 
     // now with AFI
@@ -2332,7 +2302,8 @@ void BruteforceIso15693Afi(uint32_t speed) {
         data[2] = i & 0xFF;
         AddCrc15(data, 4);
 
-        recvlen = SendDataTag(data, datalen, false, speed, recv, sizeof(recv), start_time, ISO15693_READER_TIMEOUT, &eof_time);
+        recvlen = 0;
+        res = SendDataTag(data, datalen, false, speed, recv, sizeof(recv), start_time, ISO15693_READER_TIMEOUT, &eof_time, &recvlen);
         start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 
         WDT_HIT();
@@ -2341,7 +2312,7 @@ void BruteforceIso15693Afi(uint32_t speed) {
             Dbprintf("AFI = %i  UID = %s", i, iso15693_sprintUID(NULL, recv + 2));
         }
 
-        aborted = BUTTON_PRESS() && data_available();
+        aborted = (BUTTON_PRESS() && data_available());
         if (aborted) {
             break;
         }
@@ -2384,10 +2355,10 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
     }
 
     uint32_t start_time = 0;
-    int recvlen = SendDataTag(data, datalen, true, speed, (recv ? recvbuf : NULL), sizeof(recvbuf), start_time, timeout, &eof_time);
-
-    if (recvlen == PM3_ETEAROFF) { // tearoff occurred
-        reply_mix(CMD_ACK, recvlen, 0, 0, NULL, 0);
+    uint16_t recvlen = 0;
+    int res = SendDataTag(data, datalen, true, speed, (recv ? recvbuf : NULL), sizeof(recvbuf), start_time, timeout, &eof_time, &recvlen);
+    if (res == PM3_ETEAROFF) { // tearoff occurred
+        reply_ng(CMD_HF_ISO15693_COMMAND, res, NULL, 0);
     } else {
 
         bool fsk = data[0] & ISO15_REQ_SUBCARRIER_TWO;
@@ -2396,16 +2367,18 @@ void DirectTag15693Command(uint32_t datalen, uint32_t speed, uint32_t recv, uint
         // send a single EOF to get the tag response
         if (request_answer) {
             start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
-            recvlen = SendDataTagEOF((recv ? recvbuf : NULL), sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT, &eof_time, fsk, recv_speed);
+            res = SendDataTagEOF((recv ? recvbuf : NULL), sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT, &eof_time, fsk, recv_speed, &recvlen);
         }
 
         if (recv) {
             recvlen = MIN(recvlen, ISO15693_MAX_RESPONSE_LENGTH);
-            reply_mix(CMD_ACK, recvlen, 0, 0, recvbuf, recvlen);
+            reply_ng(CMD_HF_ISO15693_COMMAND, res, recvbuf, recvlen);
         } else {
-            reply_mix(CMD_ACK, 1, 0, 0, NULL, 0);
+            reply_ng(CMD_HF_ISO15693_COMMAND, PM3_SUCCESS, NULL, 0);
         }
     }
+
+
     // note: this prevents using hf 15 cmd with s option - which isn't implemented yet anyway
     // also prevents hf 15 raw -k  keep_field on ...
     FpgaWriteConfWord(FPGA_MAJOR_MODE_OFF);
@@ -2425,10 +2398,11 @@ void LockPassSlixIso15693(uint32_t pass_id, uint32_t password) {
     //uint8_t cmd_write_pass[] = {ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_ADDRESS, 0xB4, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     uint8_t cmd_lock_pass[] = {ISO15693_REQ_DATARATE_HIGH | ISO15693_REQ_ADDRESS, 0xB5, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00 };
     uint16_t crc;
-    int recvlen = 0;
+    uint16_t recvlen = 0;
     uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
     uint32_t start_time = 0;
     bool done = false;
+    int res;
 
     // setup 'get random number' command
     crc = Iso15693Crc(cmd_get_rnd, 3);
@@ -2460,8 +2434,8 @@ void LockPassSlixIso15693(uint32_t pass_id, uint32_t password) {
             break;
         }
 
-        recvlen = SendDataTag(cmd_get_rnd, sizeof(cmd_get_rnd), true, true, recvbuf, sizeof(recvbuf), start_time);
-        if (recvlen != 5) {
+        res = SendDataTag(cmd_get_rnd, sizeof(cmd_get_rnd), true, true, recvbuf, sizeof(recvbuf), start_time, &recvlen);
+        if (res != PM3_SUCCESS && recvlen != 5) {
             LED_C_ON();
         } else {
             Dbprintf("LockPass: Received random 0x%02X%02X (%d)", recvbuf[1], recvbuf[2], recvlen);
@@ -2477,8 +2451,8 @@ void LockPassSlixIso15693(uint32_t pass_id, uint32_t password) {
             cmd_set_pass[9] = crc >> 8;
 
             Dbprintf("LockPass: Sending old password to end privacy mode", cmd_set_pass[4], cmd_set_pass[5], cmd_set_pass[6], cmd_set_pass[7]);
-            recvlen = SendDataTag(cmd_set_pass, sizeof(cmd_set_pass), false, true, recvbuf, sizeof(recvbuf), start_time);
-            if (recvlen != 3) {
+            res = SendDataTag(cmd_set_pass, sizeof(cmd_set_pass), false, true, recvbuf, sizeof(recvbuf), start_time, &recvlen);
+            if (res != PM3_SUCCESS && recvlen != 3) {
                 Dbprintf("LockPass: Failed to set password (%d)", recvlen);
                 LED_B_ON();
             } else {
@@ -2487,8 +2461,8 @@ void LockPassSlixIso15693(uint32_t pass_id, uint32_t password) {
                 cmd_inventory[4] = crc >> 8;
 
                 Dbprintf("LockPass: Searching for tag...");
-                recvlen = SendDataTag(cmd_inventory, sizeof(cmd_inventory), false, true, recvbuf, sizeof(recvbuf), start_time);
-                if (recvlen != 12) {
+                res = SendDataTag(cmd_inventory, sizeof(cmd_inventory), false, true, recvbuf, sizeof(recvbuf), start_time, &recvlen);
+                if (res != PM3_SUCCESS && recvlen != 12) {
                     Dbprintf("LockPass: Failed to read inventory (%d)", recvlen);
                     LED_B_ON();
                     LED_C_ON();
@@ -2506,8 +2480,8 @@ void LockPassSlixIso15693(uint32_t pass_id, uint32_t password) {
 
                     Dbprintf("LockPass: locking to password 0x%02X%02X%02X%02X for ID %02X", cmd_set_pass[4], cmd_set_pass[5], cmd_set_pass[6], cmd_set_pass[7], pass_id);
 
-                    recvlen = SendDataTag(cmd_lock_pass, sizeof(cmd_lock_pass), false, true, recvbuf, sizeof(recvbuf), start_time);
-                    if (recvlen != 3) {
+                    res = SendDataTag(cmd_lock_pass, sizeof(cmd_lock_pass), false, true, recvbuf, sizeof(recvbuf), start_time, &recvlen);
+                    if (res != PM3_SUCCESS && recvlen != 3) {
                         Dbprintf("LockPass: Failed to lock password (%d)", recvlen);
                     } else {
                         Dbprintf("LockPass: Successful (%d)", recvlen);
@@ -2560,12 +2534,24 @@ void SetTag15693Uid(const uint8_t *uid) {
 
     uint32_t start_time = 0;
     uint32_t eof_time = 0;
+    uint16_t recvlen = 0;
+    int res = PM3_SUCCESS;
     for (int i = 0; i < 4; i++) {
-        SendDataTag(cmd[i], sizeof(cmd[i]), i == 0 ? true : false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, &eof_time);
+        res = SendDataTag(
+                  cmd[i],
+                  sizeof(cmd[i]),
+                  (i == 0) ? true : false,
+                  true,
+                  recvbuf,
+                  sizeof(recvbuf),
+                  start_time,
+                  ISO15693_READER_TIMEOUT_WRITE,
+                  &eof_time,
+                  &recvlen);
         start_time = eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
     }
 
-    reply_ng(CMD_HF_ISO15693_CSETUID, PM3_SUCCESS, NULL, 0);
+    reply_ng(CMD_HF_ISO15693_CSETUID, res, NULL, 0);
     switch_off();
 }
 
@@ -2585,8 +2571,9 @@ static bool get_rnd_15693_slixl(uint32_t start_time, uint32_t *eof_time, uint8_t
     AddCrc15(c, 3);
 
     uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
-    int recvlen = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time);
-    if (recvlen != 5) {
+    uint16_t recvlen = 0;
+    int res = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time, &recvlen);
+    if (res != PM3_SUCCESS && recvlen != 5) {
         return false;
     }
 
@@ -2609,11 +2596,11 @@ static uint32_t set_pass_15693_slixl(uint32_t start_time, uint32_t *eof_time, ui
 
     start_time = *eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
     uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
-    int recvlen = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time);
-    if (recvlen != 3) {
+    uint16_t recvlen = 0;
+    int res = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time, &recvlen);
+    if (res != PM3_SUCCESS && recvlen != 3) {
         return PM3_EWRONGANSWER;
     }
-
     return PM3_SUCCESS;
 }
 
@@ -2631,8 +2618,9 @@ static uint32_t enable_privacy_15693_slixl(uint32_t start_time, uint32_t *eof_ti
 
     start_time = *eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
     uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
-    int recvlen = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time);
-    if (recvlen != 3) {
+    uint16_t recvlen = 0
+    int res  = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time, &recvlen);
+    if (res != PM3_SUCCESS && recvlen != 3) {
         return PM3_EWRONGANSWER;
     }
     return PM3_SUCCESS;
@@ -2653,8 +2641,9 @@ static uint32_t write_password_15693_slixl(uint32_t start_time, uint32_t *eof_ti
     start_time = *eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
 
     uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
-    int recvlen = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time);
-    if (recvlen != 3) {
+    uint16_t recvlen = 0;
+    int res = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time, &recvlen);
+    if (res != PM3_SUCCESS && recvlen != 3) {
         return PM3_EWRONGANSWER;
     }
     return PM3_SUCCESS;
@@ -2674,8 +2663,9 @@ static uint32_t destroy_15693_slixl(uint32_t start_time, uint32_t *eof_time, uin
 
     start_time = *eof_time + DELAY_ISO15693_VICC_TO_VCD_READER;
     uint8_t recvbuf[ISO15693_MAX_RESPONSE_LENGTH];
-    int recvlen = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time);
-    if (recvlen != 3) {
+    uint16_t recvlen = 0;
+    int res = SendDataTag(c, sizeof(c), false, true, recvbuf, sizeof(recvbuf), start_time, ISO15693_READER_TIMEOUT_WRITE, eof_time, &recvlen);
+    if (res != PM3_SUCCESS && recvlen != 3) {
         return PM3_EWRONGANSWER;
     }
     return PM3_SUCCESS;

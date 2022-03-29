@@ -3,6 +3,10 @@ All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
 ## [unreleased][unreleased]
+ - Use 128 bit slices whenever ARM NEON is available to speed up hardnested (@Doridian)
+ - Fixed compilation of mfd_aes_brute on Apple M1 based Macs (@Doridian)
+ - Changed calculation of companion ARM firmware hash to be uniform accross platforms (@Doridian)
+ - Changed `hf mf *` - verbose flag now also decode and prints found value blocks (@iceman1001)
  - Changed `hf mf wrbl` - added more helptext and new param --force to point out block0 writes (@iceman1001)
  - Changed `hf 15 raw` - it now uses NG frame for response (@iceman1001)
  - Added `hf_14a_i2crevive` Script, revives soft bricked i2c (@equipter)

@@ -37,9 +37,15 @@
 #include <unistd.h>
 //#include <mbedtls/aes.h>
 #include "util_posix.h"
-#include "aes-ni.h"
-#include "detectaes.h"
 #include "randoms.h"
+
+#include "aes-ni.h"
+
+#if defined(__APPLE__) || defined(__MACH__)
+#else
+    #include "detectaes.h"
+#endif
+
 
 #define AEND  "\x1b[0m"
 #define _RED_(s) "\x1b[31m" s AEND
@@ -374,11 +380,15 @@ int main(int argc, char *argv[]) {
 
     uint64_t start_time = atoi(argv[3]);
 
-    const bool support_aesni = platform_aes_hw_available();
-
     printf("Crypto algo............ " _GREEN_("%s") "\n", algostr);
     printf("LCR Random generator... " _GREEN_("%s") "\n", generators[g_idx].Name);
-    printf("AES-NI detected........ " _GREEN_("%s") "\n", (support_aesni) ? "yes" : "no");
+
+    #if defined(__APPLE__) || defined(__MACH__)
+    #else
+        bool support_aesni = platform_aes_hw_available();
+        printf("AES-NI detected........ " _GREEN_("%s") "\n", (support_aesni) ? "yes" : "no");
+    #endif
+
     printf("Starting timestamp..... ");
     print_time(start_time);
 

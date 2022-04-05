@@ -25,7 +25,6 @@
 #include "cmdhfmf.h"
 #include "cmdhf14a.h"
 #include "comms.h"
-#include "fileutils.h"
 #include "protocols.h"
 #include "generator.h"
 #include "nfc/ndef.h"
@@ -4012,7 +4011,7 @@ int CmdHF14MfuNDEFRead(const char *Cmd) {
     // Get tag type
     TagTypeUL_t tagtype = GetHF14AMfU_Type();
     if (tagtype == UL_ERROR) {
-        PrintAndLogEx(WARNING, "No Ultraligth / NTAG based tag found");
+        PrintAndLogEx(WARNING, "No Ultralight / NTAG based tag found");
         return PM3_ESOFT;
     }
 
@@ -4200,7 +4199,7 @@ static int CmdHF14AMfuView(const char *Cmd) {
             res = loadFileEML_safe(filename, (void **)&dump, &bytes_read);
             break;
         case DICTIONARY: {
-            PrintAndLogEx(ERR, "Error: Only BIN/JSON formats allowed");
+            PrintAndLogEx(ERR, "Error: Only BIN/EML/JSON formats allowed");
             free(dump);
             return PM3_EINVARG;
         }

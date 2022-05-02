@@ -226,9 +226,9 @@ static int CmdParadoxClone(const char *Cmd) {
     CLIParserContext *ctx;
     CLIParserInit(&ctx, "lf paradox clone",
                   "clone a paradox tag to a T55x7, Q5/T5555 or EM4305/4469 tag.",
-                  "lf paradox clone --raw 0f55555695596a6a9999a59a\n"
-                  "lf paradox clone -r 0f55555695596a6a9999a59a --q5      -> encode for Q5/T5555 tag\n"
-                  "lf paradox clone -r 0f55555695596a6a9999a59a --em      -> encode for EM4305/4469"
+                  "lf paradox clone --raw 0f55555695596a6a9999a59a         -> encode for T55x7 tag\n"
+                  "lf paradox clone --raw 0f55555695596a6a9999a59a --q5    -> encode for Q5/T5555 tag\n"
+                  "lf paradox clone --raw 0f55555695596a6a9999a59a --em    -> encode for EM4305/4469"
                  );
 
     void *argtable[] = {
@@ -275,7 +275,12 @@ static int CmdParadoxClone(const char *Cmd) {
 
     // EM4305
     if (em) {
+        PrintAndLogEx(WARNING, "Beware some EM4305 tags don't support FSK and datarate = RF/50, check your tag copy!");
         blocks[0] = EM4305_PARADOX_CONFIG_BLOCK;
+        // invert FSK data
+        for (uint8_t i = 1; i < ARRAYLEN(blocks); i++) {
+                blocks[i] = blocks[i] ^ 0xFFFFFFFF;
+        }
         snprintf(cardtype, sizeof(cardtype), "EM4305/4469");
     }
 

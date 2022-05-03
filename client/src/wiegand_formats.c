@@ -928,8 +928,8 @@ static bool Unpack_C15001(wiegand_message_t *packed, wiegand_card_t *card) {
 static bool Pack_C10202(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
     memset(packed, 0, sizeof(wiegand_message_t));
 
-    if (card->FacilityCode > 0x000000FF) return false; // Can't encode FC.
-    if (card->CardNumber > 0x0000FFFF) return false; // Can't encode CN.
+    if (card->FacilityCode > 0xFFFF) return false; // Can't encode FC.
+    if (card->CardNumber > 0xFFFF) return false; // Can't encode CN.
     if (card->IssueLevel > 0) return false; // Not used in this format
     if (card->OEM > 0x000003FF) return false; // Can't encode OEM.
 

@@ -259,6 +259,15 @@ int demodAWID(bool verbose) {
             code2 = bytebits_to_byte(bits + 8 + (fmtLen - 32), 32);
             PrintAndLogEx(SUCCESS, "AWID - len: " _GREEN_("%d") " FC: " _GREEN_("%d") " Card: " _GREEN_("%u") " - Wiegand: " _GREEN_("%x%08x") ", Raw: %08x%08x%08x", fmtLen, fc, cardnum, code1, code2, rawHi2, rawHi, rawLo);
             break;
+
+/*        case 60:
+             fc = bytebits_to_byte(bits + 0, 0);
+             cardnum = bytebits_to_byte(bits + 1, 60);
+             code1 = bytebits_to_byte(bits + 8, (fmtLen - 32));
+             code2 = bytebits_to_byte(bits + 8 + (fmtLen - 32), 32);
+             PrintAndLogEx(SUCCESS, "AWID - len: " _GREEN_("%d") " FC: " _GREEN_("%d") " Card: " _GREEN_("%u") " - Wiegand: " _GREEN_("%x%08x") ", Raw: %08x%08x%08x", fmtLen, fc, cardnum, code1, code2, rawHi2, rawHi, rawLo);
+             break;*/
+
         default:
             if (fmtLen > 32) {
                 cardnum = bytebits_to_byte(bits + 8 + (fmtLen - 17), 16);

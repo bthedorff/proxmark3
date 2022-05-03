@@ -593,7 +593,7 @@ static bool Unpack_PTProx25(wiegand_message_t *packed, wiegand_card_t *card) {
 
 
 
-
+/*
 static bool Pack_PTProx25(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
     memset(packed, 0, sizeof(wiegand_message_t));
 
@@ -620,7 +620,91 @@ static bool Unpack_PTProx25(wiegand_message_t *packed, wiegand_card_t *card) {
     card->CardNumber = get_linear_field(packed, 13, 20);
     // unknown parity scheme
     return true;
+}*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//PTPROX25 ONLY DEFAULT FC 1.
+
+static bool Pack_PTProx25(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
+    memset(packed, 0, sizeof(wiegand_message_t));
+
+    if (card->FacilityCode > 1) return false; // Can't encode FC.
+    if (card->CardNumber > 0x3FFFFF) return false; // Can't encode CN.
+    if (card->IssueLevel > 0) return false; // Not used in this format
+    if (card->OEM > 0) return false; // Not used in this format
+
+    packed->Length = 34; // Set number of bits
+    set_linear_field(packed, card->FacilityCode, 1, 1);      //1,1
+    set_linear_field(packed, card->CardNumber, 12, 22);     // 12,22
+        set_bit_by_position(packed,
+                            evenparity32(get_linear_field(packed, 1, 16))
+                            , 0);
+        set_bit_by_position(packed,
+                            oddparity32(get_linear_field(packed, 17, 16))
+                            , 33);
+    // unknown parity scheme
+    if (preamble)
+        return add_HID_header(packed);
+    return true;
 }
+
+static bool Unpack_PTProx25(wiegand_message_t *packed, wiegand_card_t *card) {
+    memset(card, 0, sizeof(wiegand_card_t));
+
+    if (packed->Length != 34) return false; // Wrong length? Stop here.
+
+    card->FacilityCode = get_linear_field(packed, 1, 1);
+    card->CardNumber = get_linear_field(packed, 12, 22);
+    // unknown parity scheme
+        card->ParityValid =
+            (get_bit_by_position(packed, 0) == evenparity32(get_linear_field(packed, 1, 16))) &&
+            (get_bit_by_position(packed, 33) == oddparity32(get_linear_field(packed, 17, 16)));
+    return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static bool Pack_C1k35s(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
     memset(packed, 0, sizeof(wiegand_message_t));
@@ -814,6 +898,88 @@ static bool Unpack_C15001(wiegand_message_t *packed, wiegand_card_t *card) {
     return true;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//CONTINENTAL 36BIT (CORRECT AND TESTED
+static bool Pack_C10202(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
+    memset(packed, 0, sizeof(wiegand_message_t));
+
+    if (card->FacilityCode > 0x000000FF) return false; // Can't encode FC.
+    if (card->CardNumber > 0x0000FFFF) return false; // Can't encode CN.
+    if (card->IssueLevel > 0) return false; // Not used in this format
+    if (card->OEM > 0x000003FF) return false; // Can't encode OEM.
+
+    //if (card->OEM == 0)
+    //    card->OEM = 900;
+
+    packed->Length = 36; // Set number of bits
+    //set_linear_field(packed, card->OEM, 1, 10);
+    set_linear_field(packed, card->FacilityCode, 1, 16);
+    set_linear_field(packed, card->CardNumber, 17, 16);
+    set_bit_by_position(packed, evenparity32(get_linear_field(packed, 18, 18)), 0);
+    set_bit_by_position(packed, oddparity32(get_linear_field(packed, 0, 18)), 35);
+    if (preamble)
+        return add_HID_header(packed);
+    return true;
+}
+
+static bool Unpack_C10202(wiegand_message_t *packed, wiegand_card_t *card) {
+    memset(card, 0, sizeof(wiegand_card_t));
+
+    if (packed->Length != 36) return false; // Wrong length? Stop here.
+
+    //card->OEM = get_linear_field(packed, 1, 10);
+    card->FacilityCode = get_linear_field(packed, 1, 16);
+    card->CardNumber = get_linear_field(packed, 17, 16);
+    card->ParityValid =
+        (get_bit_by_position(packed, 0) == evenparity32(get_linear_field(packed, 18, 18))) &&
+        (get_bit_by_position(packed, 35) == oddparity32(get_linear_field(packed, 0, 18)));
+    return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 static bool Pack_H10302(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
     memset(packed, 0, sizeof(wiegand_message_t));
 
@@ -871,6 +1037,92 @@ static bool Unpack_P10004(wiegand_message_t *packed, wiegand_card_t *card) {
     // unknown parity scheme
     return true;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Spectrum health A10202 test...... CHECKED WITH DUMP WORKS. CLONES WORK
+
+static bool Pack_A10202(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
+    memset(packed, 0, sizeof(wiegand_message_t));
+
+    if (card->FacilityCode > 0x0000FFFF) return false; // Can't encode FC.
+    if (card->CardNumber > 0x0007FFFF) return false; // Can't encode CN.
+    if (card->IssueLevel > 0) return false; // Not used in this format
+    if (card->OEM > 0) return false; // Not used in this format
+
+    packed->Length = 37; // Set number of bits
+
+    set_linear_field(packed, card->FacilityCode, 6, 11);
+    set_linear_field(packed, card->CardNumber, 17, 19);
+    set_bit_by_position(packed, evenparity32(get_linear_field(packed, 1, 18)), 0);
+    set_bit_by_position(packed, oddparity32(get_linear_field(packed, 18, 18)), 36);
+
+
+    // unknown parity scheme
+    if (preamble)
+        return add_HID_header(packed);
+    return true;
+}
+
+static bool Unpack_A10202(wiegand_message_t *packed, wiegand_card_t *card) {
+    memset(card, 0, sizeof(wiegand_card_t));
+
+    if (packed->Length != 37) return false; // Wrong length? Stop here.
+
+    card->FacilityCode = get_linear_field(packed, 6, 11);
+    card->CardNumber = get_linear_field(packed, 17, 19);
+    card->ParityValid =
+        (get_bit_by_position(packed, 0) == evenparity32(get_linear_field(packed, 1, 18))) &&
+        (get_bit_by_position(packed, 36) == oddparity32(get_linear_field(packed, 18, 18)));
+    // unknown parity scheme
+    return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 static bool Pack_H10304(wiegand_card_t *card, wiegand_message_t *packed, bool preamble) {
     memset(packed, 0, sizeof(wiegand_message_t));
@@ -1468,6 +1720,7 @@ static const cardformat_t FormatTable[] = {
     {"BQT34",   Pack_bqt34,   Unpack_bqt34,   "BQT 34-bit",                 {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"C1k35s",  Pack_C1k35s,  Unpack_C1k35s,  "HID Corporate 1000 35-bit std", {1, 1, 0, 0, 1}}, // imported from old pack/unpack
     {"C15001",  Pack_C15001,  Unpack_C15001,  "HID KeyScan 36-bit",         {1, 1, 0, 1, 1}}, // from Proxmark forums
+    {"C10202",  Pack_C10202,  Unpack_C10202,  "Continential 36-bit",         {1, 1, 0, 1, 1}}, // Continential 36bit
     {"S12906",  Pack_S12906,  Unpack_S12906,  "HID Simplex 36-bit",         {1, 1, 1, 0, 1}}, // from cardinfo.barkweb.com.au
     {"Sie36",   Pack_Sie36,   Unpack_Sie36,   "HID 36-bit Siemens",         {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"H10320",  Pack_H10320,  Unpack_H10320,  "HID H10320 36-bit BCD",      {1, 0, 0, 0, 1}}, // from Proxmark forums
@@ -1476,6 +1729,7 @@ static const cardformat_t FormatTable[] = {
     {"P10004",  Pack_P10004,  Unpack_P10004,  "HID P10004 37-bit PCSC",     {1, 1, 0, 0, 0}}, // from @bthedorff; PR #1559
     {"HGen37",  Pack_HGeneric37, Unpack_HGeneric37,  "HID Generic 37-bit", {1, 0, 0, 0, 1}}, // from cardinfo.barkweb.com.au
     {"MDI37",   Pack_MDI37,   Unpack_MDI37,   "PointGuard MDI 37-bit",         {1, 1, 0, 0, 1}}, // from cardinfo.barkweb.com.au
+    {"A10202",  Pack_A10202,  Unpack_A10202,  "HID A10202 37-bit",     {1, 1, 0, 0, 0}}, // Spectrum test format
     {"BQT38",   Pack_bqt38,   Unpack_bqt38,   "BQT 38-bit",                    {1, 1, 1, 0, 1}}, // from cardinfo.barkweb.com.au
     {"ISCS",    Pack_iscs38,  Unpack_iscs38,  "ISCS 38-bit",                   {1, 1, 0, 1, 1}}, // from cardinfo.barkweb.com.au
     {"PW39",    Pack_pw39,    Unpack_pw39,    "Pyramid 39-bit wiegand format", {1, 1, 0, 0, 1}},  // from cardinfo.barkweb.com.au

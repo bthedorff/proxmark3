@@ -931,7 +931,7 @@ static bool Pack_C10202(wiegand_card_t *card, wiegand_message_t *packed, bool pr
     if (card->FacilityCode > 0xFFFF) return false; // Can't encode FC.
     if (card->CardNumber > 0xFFFF) return false; // Can't encode CN.
     if (card->IssueLevel > 0) return false; // Not used in this format
-    if (card->OEM > 0x000003FF) return false; // Can't encode OEM.
+    if (card->OEM > 0) return false; // Can't encode OEM.
 
     //if (card->OEM == 0)
     //    card->OEM = 900;
@@ -940,8 +940,8 @@ static bool Pack_C10202(wiegand_card_t *card, wiegand_message_t *packed, bool pr
     //set_linear_field(packed, card->OEM, 1, 10);
     set_linear_field(packed, card->FacilityCode, 1, 16);
     set_linear_field(packed, card->CardNumber, 17, 16);
-    set_bit_by_position(packed, evenparity32(get_linear_field(packed, 18, 18)), 0);
-    set_bit_by_position(packed, oddparity32(get_linear_field(packed, 0, 18)), 35);
+    set_bit_by_position(packed, evenparity32(get_linear_field(packed, 18, 18)), 35);
+    set_bit_by_position(packed, oddparity32(get_linear_field(packed, 0, 18)), 0);
     if (preamble)
         return add_HID_header(packed);
     return true;
@@ -956,8 +956,8 @@ static bool Unpack_C10202(wiegand_message_t *packed, wiegand_card_t *card) {
     card->FacilityCode = get_linear_field(packed, 1, 16);
     card->CardNumber = get_linear_field(packed, 17, 16);
     card->ParityValid =
-        (get_bit_by_position(packed, 0) == evenparity32(get_linear_field(packed, 18, 18))) &&
-        (get_bit_by_position(packed, 35) == oddparity32(get_linear_field(packed, 0, 18)));
+        (get_bit_by_position(packed, 35) == evenparity32(get_linear_field(packed, 18, 18))) &&
+        (get_bit_by_position(packed, 0) == oddparity32(get_linear_field(packed, 0, 18)));
     return true;
 }
 

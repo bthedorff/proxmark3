@@ -24,6 +24,7 @@
 #include "util.h"
 #include "fileutils.h"
 #include "jansson.h"
+#include "mifaredefault.h"
 
 // https://www.nxp.com/docs/en/application-note/AN10787.pdf
 static json_t *mad_known_aids = NULL;
@@ -297,6 +298,12 @@ static int MADInfoByteDecode(const uint8_t *sector, bool swapmad, int mad_ver, b
     return info;
 }
 
+void MADPrintHeader(void) {
+    PrintAndLogEx(NORMAL, "");
+    PrintAndLogEx(INFO, "--- " _CYAN_("MIFARE App Directory Information") " ----------------");
+    PrintAndLogEx(INFO, "-----------------------------------------------------");
+}
+
 int MAD1DecodeAndPrint(uint8_t *sector, bool swapmad, bool verbose, bool *haveMAD2) {
     open_mad_file(&mad_known_aids, verbose);
 
@@ -389,4 +396,11 @@ int MADDFDecodeAndPrint(uint32_t short_aid) {
     print_aid_description(mad_known_aids, short_aid, fmt, false);
     close_mad_file(mad_known_aids);
     return PM3_SUCCESS;
+}
+
+bool HasMADKey(uint8_t *d) {
+    if (d == NULL)
+        return false;
+
+    return (memcmp(d + (3 * MFBLOCK_SIZE), g_mifare_mad_key, 6) != 0);
 }

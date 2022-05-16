@@ -36,8 +36,6 @@
 #include "cmdhf14a.h"           // exchange APDU
 #include "crypto/libpcrypto.h"
 
-#define MFBLOCK_SIZE 16
-
 #define MIFARE_4K_MAXBLOCK 256
 #define MIFARE_2K_MAXBLOCK 128
 #define MIFARE_1K_MAXBLOCK 64
@@ -219,9 +217,9 @@ static char GetFormatFromSector(uint8_t sectors) {
     }
 }
 
-static bool mfc_value(const uint8_t *d, uint32_t *val) {
+static bool mfc_value(const uint8_t *d, int32_t *val) {
     // values
-    uint32_t a = MemLeToUint4byte(d);
+    int32_t a = (int32_t)MemLeToUint4byte(d);
     uint32_t a_inv = MemLeToUint4byte(d + 4);
     uint32_t b = MemLeToUint4byte(d + 8);
 
@@ -243,9 +241,9 @@ static void mf_print_block(uint8_t blockno, uint8_t *d, bool verbose) {
         PrintAndLogEx(INFO, "%3d | " _YELLOW_("%s"), blockno, sprint_hex_ascii(d, MFBLOCK_SIZE));
     } else {
 
-        uint32_t value = 0;
+        int32_t value = 0;
         if (verbose && mfc_value(d, &value)) {
-            PrintAndLogEx(INFO, "%3d | " _CYAN_("%s") " %"PRIu32, blockno, sprint_hex_ascii(d, MFBLOCK_SIZE), value);
+            PrintAndLogEx(INFO, "%3d | " _CYAN_("%s") " %"PRIi32, blockno, sprint_hex_ascii(d, MFBLOCK_SIZE), value);
         } else {
             PrintAndLogEx(INFO, "%3d | %s ", blockno, sprint_hex_ascii(d, MFBLOCK_SIZE));
         }
@@ -262,6 +260,11 @@ static void mf_print_blocks(uint16_t n, uint8_t *d, bool verbose) {
     }
     PrintAndLogEx(INFO, "----+-------------------------------------------------+-----------------");
     PrintAndLogEx(HINT, _CYAN_("cyan") " = value block with decoded value");
+
+    // MAD detection
+    if (HasMADKey(d)) {
+        PrintAndLogEx(HINT, "MAD key detected. Try " _YELLOW_("`hf mf mad`") " for more details");
+    }
     PrintAndLogEx(NORMAL, "");
 }
 
@@ -309,11 +312,11 @@ static void mf_print_values(uint16_t n, uint8_t *d) {
     PrintAndLogEx(INFO, "Looking for value blocks...");
     PrintAndLogEx(NORMAL, "");
     uint8_t cnt = 0;
-    uint32_t value = 0;
+    int32_t value = 0;
     for (uint16_t i = 0; i < n; i++) {
 
         if (mfc_value(d + (i * MFBLOCK_SIZE), &value))  {
-            PrintAndLogEx(INFO, "%03d | " _YELLOW_("%" PRIu32) " " _YELLOW_("0x%" PRIX32), i, value, value);
+            PrintAndLogEx(INFO, "%03d | " _YELLOW_("%" PRIi32) " " _YELLOW_("0x%" PRIX32), i, value, value);
             ++cnt;
         }
     }
@@ -1105,38 +1108,11 @@ static int CmdHF14AMfRestore(const char *Cmd) {
     }
 
     // read dump file
-    bytes_read = 0;
     uint8_t *dump = NULL;
-    int res = 0;
-    DumpFileType_t dftype = getfiletype(datafilename);
-    switch (dftype) {
-        case BIN: {
-            res = loadFile_safe(datafilename, ".bin", (void **)&dump, &bytes_read);
-            break;
-        }
-        case EML: {
-            res = loadFileEML_safe(datafilename, (void **)&dump, &bytes_read);
-            break;
-        }
-        case JSON: {
-            dump = calloc(MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK, sizeof(uint8_t));
-            if (dump == NULL) {
-                PrintAndLogEx(WARNING, "Fail, cannot allocate memory");
-                return PM3_EMALLOC;
-            }
-            res = loadFileJSON(datafilename, (void *)dump, MIFARE_4K_MAXBLOCK * MFBLOCK_SIZE, &bytes_read, NULL);
-            break;
-        }
-        case DICTIONARY: {
-            PrintAndLogEx(ERR, "Error: Only BIN/JSON/EML formats allowed");
-            free(dump);
-            return PM3_EINVARG;
-        }
-    }
-
+    bytes_read = 0;
+    int res = pm3_load_dump(datafilename, (void **)&dump, &bytes_read, (MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK));
     if (res != PM3_SUCCESS) {
-        free(dump);
-        return PM3_EFILE;
+        return res;
     }
 
     // default authentication key
@@ -3722,6 +3698,11 @@ void printKeyTableEx(uint8_t sectorscnt, sector_t *e_sector, uint8_t start_secto
     } else {
         PrintAndLogEx(SUCCESS, "( " _YELLOW_("0") ":Failed / " _YELLOW_("1") ":Success )");
     }
+
+    // MAD detection
+    if (e_sector[MF_MAD1_SECTOR].foundKey[0] && e_sector[MF_MAD1_SECTOR].Key[MF_KEY_A] == 0xA0A1A2A3A4A5) {
+        PrintAndLogEx(HINT, "MAD key detected. Try " _YELLOW_("`hf mf mad`") " for more details");
+    }
     PrintAndLogEx(NORMAL, "");
 }
 
@@ -3934,41 +3915,14 @@ int CmdHF14AMfELoad(const char *Cmd) {
     }
 
     uint8_t *data = NULL;
-    size_t datalen = 0;
-    int res = PM3_SUCCESS;
-    DumpFileType_t dftype = getfiletype(filename);
-    switch (dftype) {
-        case BIN: {
-            res = loadFile_safe(filename, ".bin", (void **)&data, &datalen);
-            break;
-        }
-        case EML: {
-            res = loadFileEML_safe(filename, (void **)&data, &datalen);
-            break;
-        }
-        case JSON: {
-            data = calloc(MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK, sizeof(uint8_t));
-            if (data == NULL) {
-                PrintAndLogEx(WARNING, "Fail, cannot allocate memory");
-                return PM3_EMALLOC;
-            }
-            res = loadFileJSON(filename, (void *)data, MIFARE_4K_MAXBLOCK * MFBLOCK_SIZE, &datalen, NULL);
-            break;
-        }
-        case DICTIONARY: {
-            PrintAndLogEx(ERR, "Error: Only BIN/JSON/EML formats allowed");
-            free(data);
-            return PM3_EINVARG;
-        }
-    }
-
+    size_t bytes_read = 0;
+    int res = pm3_load_dump(filename, (void **)&data, &bytes_read, (MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK));
     if (res != PM3_SUCCESS) {
-        free(data);
-        return PM3_EFILE;
+        return res;
     }
 
     // 64 or 256 blocks.
-    if ((datalen % block_width) != 0) {
+    if ((bytes_read % block_width) != 0) {
         PrintAndLogEx(FAILED, "File content error. Size doesn't match blockwidth ");
         free(data);
         return PM3_ESOFT;
@@ -3976,7 +3930,7 @@ int CmdHF14AMfELoad(const char *Cmd) {
 
     // convert plain or old mfu format to new format
     if (block_width == MFU_BLOCK_SIZE) {
-        res = convert_mfu_dump_format(&data, &datalen, true);
+        res = convert_mfu_dump_format(&data, &bytes_read, true);
         if (res != PM3_SUCCESS) {
             PrintAndLogEx(FAILED, "Failed convert on load to new Ultralight/NTAG format");
             free(data);
@@ -3987,7 +3941,7 @@ int CmdHF14AMfELoad(const char *Cmd) {
         printMFUdumpEx(mfu_dump, mfu_dump->pages + 1, 0);
 
         // update expected blocks to match converted data.
-        block_cnt = datalen / MFU_BLOCK_SIZE;
+        block_cnt = bytes_read / MFU_BLOCK_SIZE;
         PrintAndLogEx(INFO, "MIFARE Ultralight override, will use %d blocks ( %u bytes )", block_cnt, block_cnt * block_width);
     }
 
@@ -4000,8 +3954,8 @@ int CmdHF14AMfELoad(const char *Cmd) {
     size_t offset = 0;
     int cnt = 0;
 
-    while (datalen && cnt < block_cnt) {
-        if (datalen == block_width) {
+    while (bytes_read && cnt < block_cnt) {
+        if (bytes_read == block_width) {
             // Disable fast mode on last packet
             g_conn.block_after_ACK = false;
         }
@@ -4016,7 +3970,7 @@ int CmdHF14AMfELoad(const char *Cmd) {
 
         cnt++;
         offset += block_width;
-        datalen -= block_width;
+        bytes_read -= block_width;
     }
     free(data);
     PrintAndLogEx(NORMAL, "");
@@ -4632,38 +4586,12 @@ static int CmdHF14AMfCLoad(const char *Cmd) {
         return PM3_SUCCESS;
     }
 
+    // reserve memory
     uint8_t *data = NULL;
     size_t bytes_read = 0;
-    int res = 0;
-    DumpFileType_t dftype = getfiletype(filename);
-    switch (dftype) {
-        case BIN: {
-            res = loadFile_safe(filename, ".bin", (void **)&data, &bytes_read);
-            break;
-        }
-        case EML: {
-            res = loadFileEML_safe(filename, (void **)&data, &bytes_read);
-            break;
-        }
-        case JSON: {
-            data = calloc(MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK, sizeof(uint8_t));
-            if (data == NULL) {
-                PrintAndLogEx(WARNING, "Fail, cannot allocate memory");
-                return PM3_EMALLOC;
-            }
-            res = loadFileJSON(filename, (void *)data, MIFARE_4K_MAXBLOCK * MFBLOCK_SIZE, &bytes_read, NULL);
-            break;
-        }
-        case DICTIONARY: {
-            PrintAndLogEx(ERR, "Error: Only BIN/JSON/EML formats allowed");
-            free(data);
-            return PM3_EINVARG;
-        }
-    }
-
+    int res = pm3_load_dump(filename, (void **)&data, &bytes_read, (MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK));
     if (res != PM3_SUCCESS) {
-        free(data);
-        return PM3_EFILE;
+        return res;
     }
 
     // 64 or 256blocks.
@@ -5395,6 +5323,7 @@ static int CmdHF14AMfMAD(const char *Cmd) {
         arg_lit0("b",  "keyb",     "use key B for access printing sectors (by default: key A)"),
         arg_lit0(NULL, "be",       "(optional, BigEndian)"),
         arg_lit0(NULL, "dch",      "decode Card Holder information"),
+        arg_str0("f", "file", "<fn>", "load dump file and decode MAD"),        
         arg_param_end
     };
     CLIExecWithReturn(ctx, Cmd, argtable, true);
@@ -5409,7 +5338,48 @@ static int CmdHF14AMfMAD(const char *Cmd) {
     bool swapmad = arg_get_lit(ctx, 5);
     bool decodeholder = arg_get_lit(ctx, 6);
 
+    int fnlen = 0;
+    char filename[FILE_PATH_SIZE] = {0};
+    CLIParamStrToBuf(arg_get_str(ctx, 7), (uint8_t *)filename, FILE_PATH_SIZE, &fnlen);
     CLIParserFree(ctx);
+
+    if (fnlen > 0) {
+
+        // read dump file
+        uint8_t *dump = NULL;
+        size_t bytes_read = 0;
+        int res = pm3_load_dump(filename, (void **)&dump, &bytes_read, (MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK));
+        if (res != PM3_SUCCESS) {
+            return res;
+        }
+
+        uint16_t block_cnt = MIN(MIFARE_1K_MAXBLOCK, (bytes_read / MFBLOCK_SIZE));
+        if (bytes_read == 320)
+            block_cnt = MIFARE_MINI_MAXBLOCK;
+        else if (bytes_read == 2048)
+            block_cnt = MIFARE_2K_MAXBLOCK;
+        else if (bytes_read == 4096)
+            block_cnt = MIFARE_4K_MAXBLOCK;
+
+        if (verbose) {
+            PrintAndLogEx(INFO, "File: " _YELLOW_("%s"), filename);
+            PrintAndLogEx(INFO, "File size %zu bytes, file blocks %d (0x%x)", bytes_read, block_cnt, block_cnt);
+        }
+
+        // MAD detection
+        if (HasMADKey(dump)) {
+            PrintAndLogEx(FAILED, "No MAD key was detected in the dump file");
+            free(dump);
+            return PM3_ESOFT;
+        }
+
+        MADPrintHeader();
+        bool haveMAD2 = false;
+        MAD1DecodeAndPrint(dump, swapmad, verbose, &haveMAD2);
+        free(dump);
+        return PM3_SUCCESS;
+    }
+
 
     uint8_t sector0[16 * 4] = {0};
     uint8_t sector10[16 * 4] = {0};
@@ -5438,9 +5408,7 @@ static int CmdHF14AMfMAD(const char *Cmd) {
         return PM3_ESOFT;
     }
 
-    PrintAndLogEx(NORMAL, "");
-    PrintAndLogEx(INFO, "--- " _CYAN_("MIFARE App Directory Information") " ----------------");
-    PrintAndLogEx(INFO, "-----------------------------------------------------");
+    MADPrintHeader();
 
     bool haveMAD2 = false;
     MAD1DecodeAndPrint(sector0, swapmad, verbose, &haveMAD2);
@@ -6171,40 +6139,12 @@ static int CmdHF14AMfView(const char *Cmd) {
     bool verbose = arg_get_lit(ctx, 2);
     CLIParserFree(ctx);
 
-    // reserve memory
+    // read dump file
     uint8_t *dump = NULL;
     size_t bytes_read = 0;
-    int res = 0;
-    DumpFileType_t dftype = getfiletype(filename);
-    switch (dftype) {
-        case BIN: {
-            res = loadFile_safe(filename, ".bin", (void **)&dump, &bytes_read);
-            break;
-        }
-        case EML: {
-            res = loadFileEML_safe(filename, (void **)&dump, &bytes_read);
-            break;
-        }
-        case JSON: {
-            dump = calloc(MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK, sizeof(uint8_t));
-            if (dump == NULL) {
-                PrintAndLogEx(WARNING, "Fail, cannot allocate memory");
-                return PM3_EMALLOC;
-            }
-            res = loadFileJSON(filename, (void *)dump, MIFARE_4K_MAXBLOCK * MFBLOCK_SIZE, &bytes_read, NULL);
-            break;
-        }
-        case DICTIONARY: {
-            PrintAndLogEx(ERR, "Error: Only BIN/JSON/EML formats allowed");
-            free(dump);
-            return PM3_EINVARG;
-        }
-    }
-
+    int res = pm3_load_dump(filename, (void **)&dump, &bytes_read, (MFBLOCK_SIZE * MIFARE_4K_MAXBLOCK));
     if (res != PM3_SUCCESS) {
-        PrintAndLogEx(FAILED, "File: " _YELLOW_("%s") ": not found or locked.", filename);
-        free(dump);
-        return PM3_EFILE;
+        return res;
     }
 
     uint16_t block_cnt = MIN(MIFARE_1K_MAXBLOCK, (bytes_read / MFBLOCK_SIZE));
@@ -6370,10 +6310,9 @@ static int CmdHF14AMfValue(const char *Cmd) {
     CLIGetHexWithReturn(ctx, 1, data, &dlen);
     CLIParserFree(ctx);
 
-    uint32_t value = 0;
-
+    int32_t value = 0;
     if (mfc_value(data, &value))  {
-        PrintAndLogEx(SUCCESS, "Dec... " _YELLOW_("%" PRIu32), value);
+        PrintAndLogEx(SUCCESS, "Dec... " _YELLOW_("%" PRIi32), value);
         PrintAndLogEx(SUCCESS, "Hex... " _YELLOW_("0x%" PRIX32), value);
     } else {
         PrintAndLogEx(FAILED, "No value block detected");

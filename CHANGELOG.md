@@ -3,6 +3,7 @@ All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
 ## [unreleased][unreleased]
+ - Fixed `hf 14a reader --ecp` to work consistently (@kormax)
  - Change `trace list -t 14a` to annotate ECP frames of all valid V1 and V2 formats (@kormax)
  - Changed `hf mf staticnested` - significant speedups by using two encrypted nonces (@xianglin1998)
  - Change use of `sprintf` in code to `snprintf` to fix compilation on macOS (@Doridian)
@@ -64,6 +65,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
  - Changed - AID limitations when using Gallagher key diversification (@DarkMatterMatt)
  - Added new standalone mode `lf_em4100rsww` (@zabszk)
  - Fixed `hf 15 slixdisable` wrong pass id (@r1ddl3rz)
+ - Added 122 new keys from Flipper Zero community to `mfc_default_keys.dic` (@UberGuidoZ)
 
 ## [Frostbit.4.14831][2022-01-11]
  - Changed Wiegand format lookup - now case-insensitive (@iceman1001)

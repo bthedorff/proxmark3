@@ -164,7 +164,7 @@ void ascii_to_buffer(uint8_t *buf, const uint8_t *hex_data, const size_t hex_len
     size_t i = 0;
     for (i = 0; i < max_len; ++i, tmp++) {
         char c = hex_data[i];
-        snprintf(tmp, hex_max_len - (tmp - tmp_base), "%c", ((c < 32) || (c == 127)) ? '.' : c);
+        *tmp = ((c < 32) || (c == 127)) ? '.' : c;
     }
 
     size_t m = (min_str_len > i) ? min_str_len : 0;
@@ -172,7 +172,7 @@ void ascii_to_buffer(uint8_t *buf, const uint8_t *hex_data, const size_t hex_len
         m = hex_max_len;
 
     for (; i < m; i++, tmp++)
-        snprintf(tmp, hex_max_len - (tmp - tmp_base), " ");
+        *tmp = ' ';
 
     // remove last space
     *tmp = '\0';
@@ -193,7 +193,7 @@ void hex_to_buffer(uint8_t *buf, const uint8_t *hex_data, const size_t hex_len, 
         snprintf(tmp, hex_max_len - (tmp - tmp_base), (uppercase) ? "%02X" : "%02x", (unsigned int) hex_data[i]);
 
         for (size_t j = 0; j < spaces_between; j++)
-            snprintf(tmp + 2 + j, hex_max_len - ((tmp + 2 + j) - tmp_base), " ");
+            *(tmp + 2 + j) = ' ';
     }
 
     i *= (2 + spaces_between);
@@ -203,7 +203,7 @@ void hex_to_buffer(uint8_t *buf, const uint8_t *hex_data, const size_t hex_len, 
         m = hex_max_len;
 
     for (; i < m; i++, tmp++)
-        snprintf(tmp, hex_max_len - (tmp - tmp_base), " ");
+        *tmp = ' ';
 
     // remove last space
     *tmp = '\0';

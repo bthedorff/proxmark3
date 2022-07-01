@@ -3,6 +3,9 @@ All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
 ## [unreleased][unreleased]
+ - Changed `hf 14b raw` - now supports selecting Fuji/Xerox tag (@horror)
+ - Added `hf xerox dump` - dump a Fuji/Xerox tag (@horror)
+ - Added `hf xerox info` - read Fuji/Xerox tag (@horror)
  - Fixed `hf 14a reader --ecp` to work consistently (@kormax)
  - Change `trace list -t 14a` to annotate ECP frames of all valid V1 and V2 formats (@kormax)
  - Changed `hf mf staticnested` - significant speedups by using two encrypted nonces (@xianglin1998)
@@ -67,6 +70,7 @@ This project uses the changelog in accordance with [keepchangelog](http://keepac
  - Fixed `hf 15 slixdisable` wrong pass id (@r1ddl3rz)
  - Added 122 new keys from Flipper Zero community to `mfc_default_keys.dic` (@UberGuidoZ)
  - Added showing password for the read command in the `lf t55xx sniff` command (@merlokk)
+ - Added reading texcom tk13 and tk17 tags with `hf texkom read` command (@merlokk @iceman1001)
 
 ## [Frostbit.4.14831][2022-01-11]
  - Changed Wiegand format lookup - now case-insensitive (@iceman1001)

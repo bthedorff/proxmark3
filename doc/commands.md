@@ -646,6 +646,27 @@ Check column "offline" for their availability.
 |`hf topaz raw           `|N       |`Send raw hex data to tag`
 
 
+### hf texkom
+
+ { Texkom RFIDs...                     }
+
+|command                  |offline |description
+|-------                  |------- |-----------
+|`hf texkom help         `|Y       |`This help`
+|`hf texkom reader       `|N       |`Act like a Texkom reader`
+
+
+### hf xerox
+
+ { Fuji/Xerox cartridge RFIDs...       }
+
+|command                  |offline |description
+|-------                  |------- |-----------
+|`hf xerox help          `|Y       |`This help`
+|`hf xerox info          `|N       |`Short info on Fuji/Xerox tag`
+|`hf xerox dump          `|N       |`Read all memory pages of an Fuji/Xerox tag, save to file`
+
+
 ### hf waveshare
 
  { Waveshare NFC ePaper...             }

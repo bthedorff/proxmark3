@@ -165,6 +165,23 @@ int CmdHFSearch(const char *Cmd) {
         }
     }
 
+    // texkom
+    PROMPT_CLEARLINE;
+    PrintAndLogEx(INPLACE, " Searching for TEXKOM tag...");
+    if (read_texkom_uid(false, false) == PM3_SUCCESS) {
+        PrintAndLogEx(SUCCESS, "\nValid " _GREEN_("TEXKOM tag") " found\n");
+        res = PM3_SUCCESS;
+    }
+
+    // xerox
+    PROMPT_CLEARLINE;
+    PrintAndLogEx(INPLACE, " Searching for Fuji/Xerox tag...");
+    if (IfPm3Iso14443b()) {
+        if (read_xerox_uid(false, false) == PM3_SUCCESS) {
+            PrintAndLogEx(SUCCESS, "\nValid " _GREEN_("Fuji/Xerox tag") " found\n");
+            res = PM3_SUCCESS;
+        }
+    }
 
     /*
     PROMPT_CLEARLINE;

@@ -122,7 +122,7 @@ static uint32_t EncodeFinish(uint8_t *data) {
     return encode_indx;
 }
 
-static uint32_t HfEncodeTkm(uint8_t *uid, uint8_t modulation, uint8_t *data) {
+static uint32_t HfEncodeTkm(const uint8_t *uid, uint8_t modulation, uint8_t *data) {
     uint32_t len = 0;
     if (modulation == 0) {
         // TK-13
@@ -200,7 +200,7 @@ static uint32_t HfEncodeTkm(uint8_t *uid, uint8_t modulation, uint8_t *data) {
     return len;
 }
 
-int HfWriteTkm(uint8_t *uid, uint8_t modulation, uint32_t timeout) {
+int HfSimulateTkm(uint8_t *uid, uint8_t modulation, uint32_t timeout) {
     // free eventually allocated BigBuf memory
     BigBuf_free_keep_EM();
 
@@ -220,21 +220,27 @@ int HfWriteTkm(uint8_t *uid, uint8_t modulation, uint32_t timeout) {
     FpgaWriteConfWord(FPGA_MAJOR_MODE_HF_SIMULATOR | FPGA_HF_SIMULATOR_MODULATE_212K);
     FpgaSetupSsc(FPGA_MAJOR_MODE_HF_SIMULATOR);
 
-    int vHf = 0; // in mV
     bool button_pressed = false;
     bool exit_loop = false;
     bool field_on = false;
+
+    uint32_t startTime = GetTickCount();
     while (exit_loop == false) {
 
         button_pressed = BUTTON_PRESS();
-        if (button_pressed || data_available())
+        if (button_pressed || data_available()) {
             break;
+        }
 
         WDT_HIT();
 
-        vHf = (MAX_ADC_HF_VOLTAGE * SumAdc(ADC_CHAN_HF, 32)) >> 15;
+        if (timeout > 0 && startTime + timeout < GetTickCount())
+            break;
+
+        // in mV
+        int vHf = (MAX_ADC_HF_VOLTAGE * SumAdc(ADC_CHAN_HF, 32)) >> 15;
         if (vHf > MF_MINFIELDV) {
-            if (!field_on) {
+            if (field_on == false) {
                 LED_A_ON();
                 SpinDelay(50);
             }
@@ -248,10 +254,10 @@ int HfWriteTkm(uint8_t *uid, uint8_t modulation, uint32_t timeout) {
         }
 
         SpinDelay(3);
+
         for (int i = 0; i < elen;) {
             if (AT91C_BASE_SSC->SSC_SR & AT91C_SSC_TXRDY) {
-                AT91C_BASE_SSC->SSC_THR = data[i];
-                i++;
+                AT91C_BASE_SSC->SSC_THR = data[i++];
             }
         }
     }
@@ -259,7 +265,7 @@ int HfWriteTkm(uint8_t *uid, uint8_t modulation, uint32_t timeout) {
     switch_off();
 
     if (button_pressed)
-        DbpString("button pressed");
+        DbpString("Exit by press button");
 
     reply_ng(CMD_HF_TEXKOM_SIMULATE, PM3_SUCCESS, NULL, 0);
 

@@ -13,18 +13,17 @@
 //
 // See LICENSE.txt for the text of the license.
 //-----------------------------------------------------------------------------
-#ifndef __HFSNOOP_H
-#define __HFSNOOP_H
+// High frequency proximity cards from ISO14443A / FUDAN commands
+//-----------------------------------------------------------------------------
 
-#include "proxmark3_arm.h"
+#ifndef CMDHFFUDAN_H__
+#define CMDHFFUDAN_H__
 
-// what to do with skipped data
-#define HF_SNOOP_SKIP_NONE (0)
-#define HF_SNOOP_SKIP_DROP (1)
-#define HF_SNOOP_SKIP_MAX  (2)
-#define HF_SNOOP_SKIP_MIN  (3)
-#define HF_SNOOP_SKIP_AVG  (4)
+#include "common.h"
+#include "pm3_cmd.h"
 
-int HfSniff(uint32_t samplesToSkip, uint32_t triggersToSkip, uint16_t *len, uint8_t skipMode, uint8_t skipRatio);
-void HfPlotDownload(void);
+int CmdHFFudan(const char *Cmd);
+int read_fudan_uid(bool loop, bool verbose);
+
 #endif
+

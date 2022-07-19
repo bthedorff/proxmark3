@@ -191,6 +191,15 @@ static uint8_t TexcomTK13CRC(const uint8_t *data) {
     return crc;
 }
 
+static uint8_t MMBITCRC(const uint8_t *data) {
+    return
+        (( (data[0] & 0x0f) ^ ((data[0] >> 4) & 0x0f) ^
+           (data[1] & 0x0f) ^ ((data[1] >> 4) & 0x0f) ^
+           (data[2] & 0x0f) ^ ((data[2] >> 4) & 0x0f)
+         ) ^ 0x0f
+        ) & 0x0f;
+}
+
 static unsigned char dallas_crc8(const unsigned char *data, const unsigned int size) {
     unsigned char crc = 0;
     for (unsigned int i = 0; i < size; ++i) {
@@ -215,6 +224,8 @@ static uint8_t TexcomTK17CRC(uint8_t *data) {
 static bool TexcomTK13Decode(uint32_t *implengths, uint32_t implengthslen, char *bitstring, char *cbitstring, bool verbose) {
     bitstring[0] = 0;
     cbitstring[0] = 0;
+    if (implengthslen == 0)
+        return false;
 
     uint32_t hilength = 0;
     uint32_t lowlength = 0;
@@ -274,6 +285,52 @@ static bool TexcomTK13Decode(uint32_t *implengths, uint32_t implengthslen, char 
     return ((strlen(cbitstring) == 64) && (strncmp(cbitstring, "1111111111111111", 16) == 0));
 }
 
+// general decode of the very bad signal. maybe here will be some of tk-13 old badges
+static bool TexcomTK15Decode(uint32_t *implengths, uint32_t implengthslen, char *bitstring, char *cbitstring, bool verbose) {
+    bitstring[0] = 0;
+    cbitstring[0] = 0;
+    if (implengthslen == 0)
+        return false;
+
+    bool biterror = false;
+    for (uint32_t i = 0; i < implengthslen / 2; i++) {
+        if (implengths[i * 2] == implengths[i * 2 + 1]) {
+            biterror = true;
+            break;
+        } else if (implengths[i * 2] > implengths[i * 2 + 1]) {
+            strcat(bitstring, "10");
+            strcat(cbitstring, "1");
+        } else {
+            strcat(bitstring, "01");
+            strcat(cbitstring, "0");
+        }
+    }
+
+    if (implengthslen > 2 && implengthslen % 2 != 0) {
+        int lastimplen = implengths[implengthslen - 1];
+        bool prevbit = (implengths[implengthslen - 3] > implengths[implengthslen - 2]);
+        bool thesamebit = (abs(lastimplen - (int)implengths[implengthslen - 3]) < abs(lastimplen - (int)implengths[implengthslen - 2]));
+        
+        if (prevbit ^ !thesamebit) {
+            strcat(bitstring, "10");
+            strcat(cbitstring, "1");
+        } else {
+            strcat(bitstring, "01");
+            strcat(cbitstring, "0");
+        }
+    }
+
+    if (biterror || strlen(bitstring) == 0 || strlen(cbitstring) == 0)
+        return false;
+
+    if (verbose) {
+        PrintAndLogEx(INFO, "raw bit string [%zu]: %s", strlen(bitstring), bitstring);
+        PrintAndLogEx(INFO, "bit string [%zu]: %s", strlen(cbitstring), cbitstring);
+    }
+
+    return ((strlen(cbitstring) == 64) && (strncmp(cbitstring, "1111111111111111", 16) == 0));
+}
+
 inline int TexcomTK17Get2Bits(uint32_t len1, uint32_t len2) {
     uint32_t xlen = (len2 * 100) / (len1 + len2);
     if (xlen < 10 || xlen > 90)
@@ -290,6 +347,8 @@ inline int TexcomTK17Get2Bits(uint32_t len1, uint32_t len2) {
 static bool TexcomTK17Decode(uint32_t *implengths, uint32_t implengthslen, char *bitstring, char *cbitstring, bool verbose) {
     bitstring[0] = 0;
     cbitstring[0] = 0;
+    if (implengthslen == 0)
+        return false;
 
     for (uint32_t i = 0; i < implengthslen; i = i + 2) {
         int dbit = TexcomTK17Get2Bits(implengths[i], implengths[i + 1]);
@@ -460,11 +519,14 @@ static int texkom_get_type(texkom_card_select_t *card, bool verbose) {
             }
         }
 
-        // check if it TK-13 modulation
+        // check if it TK-13 or TK-15 modulation
         // it have 127 or 128 impulses and 128 double-intervals that represents 128 bit of card code
         if (impulsecnt == 127 || impulsecnt == 128) {
             if (TexcomTK13Decode(implengths, implengthslen, bitstring, cbitstring, verbose)) {
                 found = TexkomModTK13;
+                break;
+            } else if (TexcomTK15Decode(implengths, implengthslen, bitstring, cbitstring, verbose)) {
+                found = TexkomModTK15;
                 break;
             }
         }
@@ -539,6 +601,13 @@ int read_texkom_uid(bool loop, bool verbose) {
                 if (verbose) {
                     PrintAndLogEx(INFO, "CRC...... %s", (crc) ?  _GREEN_("ok") : _RED_("fail"));
                 }
+            } else if (card.tcode[2] == 0xFF && card.tcode[3] == 0xFF) {
+                PrintAndLogEx(INFO, "TYPE..... MMBIT");
+                PrintAndLogEx(INFO, "UID...... " _GREEN_("%s"), sprint_hex(&card.tcode[4], 3));
+                crc = (MMBITCRC(&card.tcode[4]) == card.tcode[7] >> 4);
+                if (verbose) {
+                    PrintAndLogEx(INFO, "CRC...... %s", (crc) ?  _GREEN_("ok") : _RED_("fail"));
+                }
             }
             if (verbose) {
                 PrintAndLogEx(INFO, "Raw... %s", sprint_hex(card.tcode, 8));
@@ -561,14 +630,16 @@ static int CmdHFTexkomReader(const char *Cmd) {
 
     void *argtable[] = {
         arg_param_begin,
+        arg_lit0("1", NULL, "Use data from Graphbuffer"),
         arg_lit0("v",  "verbose",  "Verbose scan and output"),
         arg_lit0("@", NULL, "optional - continuous reader mode"),
         arg_param_end
     };
     CLIExecWithReturn(ctx, Cmd, argtable, true);
 
-    bool verbose = arg_get_lit(ctx, 1);
-    bool cm = arg_get_lit(ctx, 2);
+    bool gbuffer = arg_get_lit(ctx, 1);
+    bool verbose = arg_get_lit(ctx, 2);
+    bool cm = arg_get_lit(ctx, 3);
 
     CLIParserFree(ctx);
 
@@ -578,21 +649,25 @@ static int CmdHFTexkomReader(const char *Cmd) {
     }
 
     uint32_t samplesCount = 30000;
-    clearCommandBuffer();
-    SendCommandNG(CMD_HF_ACQ_RAW_ADC, (uint8_t *)&samplesCount, sizeof(uint32_t));
+    if (gbuffer) {
+        samplesCount = g_GraphTraceLen;
+    } else {
+        clearCommandBuffer();
+        SendCommandNG(CMD_HF_ACQ_RAW_ADC, (uint8_t *)&samplesCount, sizeof(uint32_t));
 
-    PacketResponseNG resp;
-    if (!WaitForResponseTimeout(CMD_HF_ACQ_RAW_ADC, &resp, 2500)) {
-        PrintAndLogEx(WARNING, "command execution time out");
-        return PM3_ETIMEOUT;
-    }
+        PacketResponseNG resp;
+        if (!WaitForResponseTimeout(CMD_HF_ACQ_RAW_ADC, &resp, 2500)) {
+            PrintAndLogEx(WARNING, "command execution time out");
+            return PM3_ETIMEOUT;
+        }
 
-    uint32_t size = (resp.data.asDwords[0]);
-    if (size > 0) {
-        if (getSamples(samplesCount, false) != PM3_SUCCESS) {
-            PrintAndLogEx(ERR, "Get samples error");
-            return PM3_EFAILED;
-        };
+        uint32_t size = (resp.data.asDwords[0]);
+        if (size > 0) {
+            if (getSamples(samplesCount, false) != PM3_SUCCESS) {
+                PrintAndLogEx(ERR, "Get samples error");
+                return PM3_EFAILED;
+            };
+        }
     }
 
     char bitstring[256] = {0};
@@ -656,6 +731,9 @@ static int CmdHFTexkomReader(const char *Cmd) {
             if (TexcomTK13Decode(implengths, implengthslen, bitstring, cbitstring, verbose)) {
                 codefound = TexkomModTK13;
                 break;
+            } else if (TexcomTK15Decode(implengths, implengthslen, bitstring, cbitstring, verbose)) {
+                codefound = TexkomModTK15;
+                break;
             }
         }
 
@@ -689,17 +767,22 @@ static int CmdHFTexkomReader(const char *Cmd) {
 
             if (codefound == TexkomModTK13)
                 PrintAndLogEx(INFO, "modulation: TK13");
+            else if (codefound == TexkomModTK15)
+                PrintAndLogEx(INFO, "modulation: TK15");
             else if (codefound == TexkomModTK17)
                 PrintAndLogEx(INFO, "modulation: TK17");
             else
                 PrintAndLogEx(INFO, "modulation: unknown");
 
             if (tcode[2] == 0x63) {
-                // TK13
-                if (codefound != TexkomModTK13) {
+                // TK13 and TK15. differs only by timings. TK15 has impulse 0 and 1 lengths very close to each other.
+                if (codefound == TexkomModTK13)
+                    PrintAndLogEx(INFO, "type      : TK13");
+                else if (codefound == TexkomModTK15)
+                    PrintAndLogEx(INFO, "type      : TK15");
+                else
                     PrintAndLogEx(WARNING, "  mod type: WRONG");
-                }
-                PrintAndLogEx(INFO, "type      : TK13");
+
                 PrintAndLogEx(INFO, "uid       : %s", sprint_hex(&tcode[3], 4));
 
                 if (TexcomTK13CRC(&tcode[3]) == tcode[7])
@@ -707,6 +790,18 @@ static int CmdHFTexkomReader(const char *Cmd) {
                 else
                     PrintAndLogEx(WARNING, "crc       : WRONG");
 
+            } else if (tcode[2] == 0xFF && tcode[3] == 0xFF) {
+                // MMBIT
+                if (codefound != TexkomModTK13 && codefound != TexkomModTK15) {
+                    PrintAndLogEx(WARNING, "  mod type: WRONG");
+                }
+                PrintAndLogEx(INFO, "type      : MMBIT");
+                PrintAndLogEx(INFO, "uid       : %s", sprint_hex(&tcode[4], 3));
+
+                if (MMBITCRC(&tcode[4]) == tcode[7] >> 4)
+                    PrintAndLogEx(INFO, "crc       : OK");
+                else
+                    PrintAndLogEx(WARNING, "crc       : WRONG");
             } else if (tcode[2] == 0xCA) {
                 // TK17
                 if (codefound != TexkomModTK17) {

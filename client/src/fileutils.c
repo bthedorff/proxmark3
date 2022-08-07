@@ -28,6 +28,7 @@
 #include "util.h"
 #include "cmdhficlass.h"  // pagemap
 #include "protocols.h"    // iclass defines
+#include "cmdhftopaz.h"   // TOPAZ defines
 
 #ifdef _WIN32
 #include "scandir.h"
@@ -632,6 +633,24 @@ int saveFileJSONex(const char *preferredName, JSONFileType ftype, uint8_t *data,
             (*callback)(root);
             break;
         }
+        case jsfTopaz: {
+            topaz_tag_t *tag = (topaz_tag_t *)(void *) data;
+            JsonSaveStr(root, "FileType", "topaz");
+            JsonSaveBufAsHexCompact(root, "$.Card.UID", tag->uid, sizeof(tag->uid));
+            JsonSaveBufAsHexCompact(root, "$.Card.H0R1", tag->HR01, sizeof(tag->HR01));
+            JsonSaveBufAsHexCompact(root, "$.Card.Size", (uint8_t *)&(tag->size), 2);
+            for (size_t i = 0; i < TOPAZ_STATIC_MEMORY / 8; i++) {
+                char path[PATH_MAX_LENGTH] = {0};
+                snprintf(path, sizeof(path), "$.blocks.%zu", i);
+                JsonSaveBufAsHexCompact(root, path, &tag->data_blocks[i][0], TOPAZ_BLOCK_SIZE);
+            }
+  
+            // ICEMAN todo:  add dynamic memory.  
+            // uint16_z Size
+            // uint8_t *dynamic_memory;
+
+            break;
+        }
         default:
             break;
     }
@@ -1102,19 +1121,21 @@ int loadFileJSONex(const char *preferredName, void *data, size_t maxdatalen, siz
     if (!strcmp(ctype, "mfcard")) {
         size_t sptr = 0;
         for (int i = 0; i < 256; i++) {
+            char blocks[30] = {0};
+            snprintf(blocks, sizeof(blocks), "$.blocks.%d", i);
+
+            size_t len = 0;
+            uint8_t block[16];
+            JsonLoadBufAsHex(root, blocks, block, 16, &len);
+            if (!len)
+                break;
+
             if (sptr + 16 > maxdatalen) {
                 retval = PM3_EMALLOC;
                 goto out;
             }
 
-            char blocks[30] = {0};
-            snprintf(blocks, sizeof(blocks), "$.blocks.%d", i);
-
-            size_t len = 0;
-            JsonLoadBufAsHex(root, blocks, &udata[sptr], 16, &len);
-            if (!len)
-                break;
-
+            memcpy(&udata[sptr], block, 16);
             sptr += len;
         }
 
@@ -1275,7 +1296,39 @@ int loadFileJSONex(const char *preferredName, void *data, size_t maxdatalen, siz
     if (!strcmp(ctype, "legic")) {
         JsonLoadBufAsHex(root, "$.raw", udata, maxdatalen, datalen);
     }
+      
+    if (!strcmp(ctype, "topaz")) {
 
+        topaz_tag_t *mem = (topaz_tag_t *)udata;
+        JsonLoadBufAsHex(root, "$.Card.UID", mem->uid, sizeof(mem->uid), datalen);
+        JsonLoadBufAsHex(root, "$.Card.HR01", mem->HR01, sizeof(mem->HR01), datalen);
+        JsonLoadBufAsHex(root, "$.Card.Size", (uint8_t *)&(mem->size), 2, datalen);
+
+        size_t sptr = 0;
+        for (int i = 0; i < (TOPAZ_STATIC_MEMORY / 8); i++) {
+
+            if (sptr + TOPAZ_BLOCK_SIZE > maxdatalen) {
+                retval = PM3_EMALLOC;
+                goto out;
+            }
+
+            char blocks[30] = {0};
+            snprintf(blocks, sizeof(blocks), "$.blocks.%d", i);
+
+            size_t len = 0;
+            JsonLoadBufAsHex(root, blocks, &mem->data_blocks[sptr][0], TOPAZ_BLOCK_SIZE, &len);
+            if (!len)
+                break;
+
+            sptr += len;
+
+            // ICEMAN todo:  add dynamic memory.  
+            // uint16_z Size
+            // uint8_t *dynamic_memory;
+        }
+
+        *datalen += sptr;
+    }
 out:
 
     if (callback != NULL) {
@@ -1934,6 +1987,9 @@ int pm3_load_dump(const char *fn, void **pdump, size_t *dumplen, size_t maxdumpl
                 return PM3_EMALLOC;
             }
             res = loadFileJSON(fn, *pdump, maxdumplen, dumplen, NULL);
+            if (res != PM3_SUCCESS) {
+                free(*pdump);
+            }
             break;
         }
         case DICTIONARY: {
@@ -1944,7 +2000,6 @@ int pm3_load_dump(const char *fn, void **pdump, size_t *dumplen, size_t maxdumpl
 
     if (res != PM3_SUCCESS) {
         PrintAndLogEx(FAILED, "File: " _YELLOW_("%s") ": not found or locked.", fn);
-        free(*pdump);
         return PM3_EFILE;
     }
 

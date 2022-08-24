@@ -5150,7 +5150,7 @@ static int CmdHf14AMfSetMod(const char *Cmd) {
     if (resp.status == PM3_SUCCESS)
         PrintAndLogEx(SUCCESS, "Change ( " _GREEN_("ok") " )");
     else
-        PrintAndLogEx(FAILED, "Change (" _GREEN_("fail") " )");
+        PrintAndLogEx(FAILED, "Change ( " _RED_("fail") " )");
 
     return resp.status;
 }
@@ -5427,7 +5427,7 @@ static int CmdHF14AMfMAD(const char *Cmd) {
         return PM3_SUCCESS;
     }
 
-    if (g_session.pm3_present == false) 
+    if (g_session.pm3_present == false)
         return PM3_ENOTTY;
 
 
@@ -6461,7 +6461,7 @@ static int CmdHF14AMfValue(const char *Cmd) {
 
     if (action < 3) {
 
-        if (g_session.pm3_present == false) 
+        if (g_session.pm3_present == false)
             return PM3_ENOTTY;
 
         if (action <= 1) { // increment/decrement value

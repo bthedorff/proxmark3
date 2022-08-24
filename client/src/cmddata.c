@@ -894,7 +894,7 @@ static int CmdAutoCorr(const char *Cmd) {
     }
 
     if (window >= g_GraphTraceLen) {
-        PrintAndLogEx(WARNING, "window must be smaller than trace (" _YELLOW_("%zu") " samples)", g_GraphTraceLen);
+        PrintAndLogEx(WARNING, "window must be smaller than trace ( " _YELLOW_("%zu") " samples )", g_GraphTraceLen);
         return PM3_EINVARG;
     }
 
@@ -1817,7 +1817,7 @@ static int CmdSamples(const char *Cmd) {
     void *argtable[] = {
         arg_param_begin,
         arg_int0("n", NULL, "<dec>", "num of samples (512 - 40000)"),
-        arg_lit0("v", "verbose", "verbose"),
+        arg_lit0("v", "verbose", "verbose output"),
         arg_param_end
     };
     CLIExecWithReturn(ctx, Cmd, argtable, true);

@@ -336,7 +336,7 @@ static void mf_print_sector_hdr(uint8_t sector) {
     PrintAndLogEx(INFO, "----+-------------------------------------------------+-----------------");
 }
 
-static bool mf_write_block(uint8_t *key, uint8_t keytype, uint8_t blockno, uint8_t *block) {
+static bool mf_write_block(const uint8_t *key, uint8_t keytype, uint8_t blockno, uint8_t *block) {
 
     uint8_t data[26];
     memcpy(data, key, MFKEY_SIZE);
@@ -3890,6 +3890,7 @@ int CmdHF14AMfELoad(const char *Cmd) {
         arg_lit0(NULL, "2k", "MIFARE Classic/Plus 2k"),
         arg_lit0(NULL, "4k", "MIFARE Classic 4k / S70"),
         arg_lit0(NULL, "ul", "MIFARE Ultralight family"),
+        arg_lit0("m", "mem",  "use RDV4 spiffs"),
         arg_int0("q", "qty", "<dec>", "manually set number of blocks (overrides)"),
         arg_param_end
     };
@@ -3905,7 +3906,8 @@ int CmdHF14AMfELoad(const char *Cmd) {
     bool m4 = arg_get_lit(ctx, 5);
     bool mu = arg_get_lit(ctx, 6);
 
-    int numblks = arg_get_int_def(ctx, 7, -1);
+    bool use_spiffs = arg_get_lit(ctx, 7);
+    int numblks = arg_get_int_def(ctx, 8, -1);
 
     CLIParserFree(ctx);
 
@@ -3943,6 +3945,36 @@ int CmdHF14AMfELoad(const char *Cmd) {
     if (numblks > 0) {
         block_cnt = MIN(numblks, block_cnt);
         PrintAndLogEx(INFO, "overriding number of blocks, will use %d blocks ( %u bytes )", block_cnt, block_cnt * block_width);
+    }
+
+    // use RDV4 spiffs
+    if (use_spiffs && IfPm3Flash() == false) {
+        PrintAndLogEx(WARNING, "Device not compiled to support spiffs");
+        return PM3_EINVARG;
+    }
+
+    if (use_spiffs) {
+
+        if (fnlen > 32) {
+            PrintAndLogEx(WARNING, "filename too long for spiffs, expected 32, got %u", fnlen);
+            return PM3_EINVARG;
+        }
+
+        clearCommandBuffer();
+        SendCommandNG(CMD_SPIFFS_ELOAD, (uint8_t *)filename, fnlen);
+        PacketResponseNG resp;
+        if (WaitForResponseTimeout(CMD_SPIFFS_ELOAD, &resp, 2000) == false) {
+            PrintAndLogEx(WARNING, "timeout while waiting for reply.");
+            return PM3_ETIMEOUT;
+        }
+
+        if (resp.status != PM3_SUCCESS) {
+            PrintAndLogEx(FAILED, "Loading file from spiffs to emulatore memory failed");
+            return PM3_EFLASH;
+        }
+
+        PrintAndLogEx(SUCCESS, "File transfered from spiffs to device emulator memory");
+        return PM3_SUCCESS;
     }
 
     uint8_t *data = NULL;
@@ -4204,7 +4236,7 @@ static int CmdHF14AMfECFill(const char *Cmd) {
     CLIParserContext *ctx;
     CLIParserInit(&ctx, "hf mf ecfill",
                   "Dump card and transfer the data to emulator memory.\n"
-                  "Keys must be laid in the emulator memory",
+                  "Keys must be in the emulator memory",
                   "hf mf ecfill          --> use key type A\n"
                   "hf mf ecfill --4k -b  --> target 4K card with key type B"
                  );
@@ -5570,6 +5602,7 @@ static int CmdHF14AMfMAD(const char *Cmd) {
     return PM3_SUCCESS;
 }
 
+
 int CmdHFMFNDEFRead(const char *Cmd) {
 
     CLIParserContext *ctx;
@@ -5607,9 +5640,9 @@ int CmdHFMFNDEFRead(const char *Cmd) {
 
     CLIParserFree(ctx);
 
-    uint16_t ndefAID = 0xe103;
+    uint16_t ndef_aid = NDEF_MFC_AID;
     if (aidlen == 2)
-        ndefAID = (aid[0] << 8) + aid[1];
+        ndef_aid = (aid[0] << 8) + aid[1];
 
     uint8_t ndefkey[6] = {0};
     memcpy(ndefkey, g_mifare_ndef_key, 6);
@@ -5617,15 +5650,15 @@ int CmdHFMFNDEFRead(const char *Cmd) {
         memcpy(ndefkey, key, 6);
     }
 
-    uint8_t sector0[16 * 4] = {0};
-    uint8_t sector10[16 * 4] = {0};
+    uint8_t sector0[MFBLOCK_SIZE * 4] = {0};
+    uint8_t sector10[MFBLOCK_SIZE * 4] = {0};
     uint8_t data[4096] = {0};
     int datalen = 0;
 
     if (verbose)
         PrintAndLogEx(INFO, "reading MAD v1 sector");
 
-    if (mfReadSector(MF_MAD1_SECTOR, MF_KEY_A, (uint8_t *)g_mifare_mad_key, sector0)) {
+    if (mfReadSector(MF_MAD1_SECTOR, MF_KEY_A, g_mifare_mad_key, sector0)) {
         PrintAndLogEx(ERR, "error, read sector 0. card doesn't have MAD or doesn't have MAD on default keys");
         PrintAndLogEx(HINT, "Try " _YELLOW_("`hf mf ndefread -k `") " with your custom key");
         return PM3_ESOFT;
@@ -5642,7 +5675,7 @@ int CmdHFMFNDEFRead(const char *Cmd) {
         if (verbose)
             PrintAndLogEx(INFO, "reading MAD v2 sector");
 
-        if (mfReadSector(MF_MAD2_SECTOR, MF_KEY_A, (uint8_t *)g_mifare_mad_key, sector10)) {
+        if (mfReadSector(MF_MAD2_SECTOR, MF_KEY_A, g_mifare_mad_key, sector10)) {
             PrintAndLogEx(ERR, "error, read sector 0x10. card doesn't have MAD or doesn't have MAD on default keys");
             PrintAndLogEx(HINT, "Try " _YELLOW_("`hf mf ndefread -k `") " with your custom key");
             return PM3_ESOFT;
@@ -5658,23 +5691,23 @@ int CmdHFMFNDEFRead(const char *Cmd) {
     }
 
     PrintAndLogEx(INFO, "reading data from tag");
-    for (int i = 0; i < madlen; i++) {
-        if (ndefAID == mad[i]) {
-            uint8_t vsector[16 * 4] = {0};
-            if (mfReadSector(i + 1, keyB ? MF_KEY_B : MF_KEY_A, ndefkey, vsector)) {
+    for (int i = 1; i <= madlen; i++) {
+        if (ndef_aid == mad[i]) {
+            uint8_t vsector[MFBLOCK_SIZE * 4] = {0};
+            if (mfReadSector(i, keyB ? MF_KEY_B : MF_KEY_A, ndefkey, vsector)) {
                 PrintAndLogEx(ERR, "error, reading sector %d ", i + 1);
                 return PM3_ESOFT;
             }
 
-            memcpy(&data[datalen], vsector, 16 * 3);
-            datalen += 16 * 3;
+            memcpy(&data[datalen], vsector, MFBLOCK_SIZE * 3);
+            datalen += MFBLOCK_SIZE * 3;
 
             PrintAndLogEx(INPLACE, "%d", i);
         }
     }
     PrintAndLogEx(NORMAL, "");
 
-    if (!datalen) {
+    if (datalen == 0) {
         PrintAndLogEx(WARNING, "no NDEF data");
         return PM3_SUCCESS;
     }
@@ -5688,9 +5721,20 @@ int CmdHFMFNDEFRead(const char *Cmd) {
     if (fnlen != 0) {
         saveFile(filename, ".bin", data, datalen);
     }
-    NDEFDecodeAndPrint(data, datalen, verbose);
 
-    PrintAndLogEx(HINT, "Try " _YELLOW_("`hf mf ndefread -vv`") " for more details");
+    res = NDEFDecodeAndPrint(data, datalen, verbose);
+    if (res != PM3_SUCCESS) {
+        PrintAndLogEx(INFO, "Trying to parse NDEF records w/o NDEF header");
+        res = NDEFRecordsDecodeAndPrint(data, datalen, verbose);
+    }
+
+    if (verbose == false) {
+        PrintAndLogEx(HINT, "Try " _YELLOW_("`hf mf ndefread -v`") " for more details");
+    } else {
+        if (verbose2 == false) {
+            PrintAndLogEx(HINT, "Try " _YELLOW_("`hf mf ndefread -vv`") " for more details");
+        }
+    }
     return PM3_SUCCESS;
 }
 
@@ -5758,6 +5802,9 @@ int CmdHFMFNDEFFormat(const char *Cmd) {
     }
 
 
+    if (g_session.pm3_present == false)
+        return PM3_ENOTTY;
+
     // Select card to get UID/UIDLEN/ATQA/SAK information
     clearCommandBuffer();
     SendCommandMIX(CMD_HF_ISO14443A_READER, ISO14A_CONNECT, 0, 0, NULL, 0);
@@ -5800,7 +5847,7 @@ int CmdHFMFNDEFFormat(const char *Cmd) {
     }
 
     // Do we have a keyfile based from UID?
-    if (strlen(keyFilename) == 0) {
+    if (keyfnlen == 0) {
         char *fptr = GenerateFilename("hf-mf-", "-key.bin");
         if (fptr) {
             strcpy(keyFilename, fptr);
@@ -5844,7 +5891,8 @@ int CmdHFMFNDEFFormat(const char *Cmd) {
         fclose(f);
     }
 
-skipfile: ;
+skipfile:
+    ;
 
     uint8_t firstblocks[8][16] = {
         { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
@@ -5886,9 +5934,9 @@ skipfile: ;
 
             }
 
-            // write to card,  try B key first,  then A
+            // write to card,  try B key first
             if (mf_write_block(keyB[i], MF_KEY_B, b, block) == 0) {
-                // write failed try B key,
+                // try A key,
                 if (mf_write_block(keyA[i], MF_KEY_A, b, block) == 0) {
                     return PM3_EFAILED;
                 }
@@ -5902,6 +5950,252 @@ skipfile: ;
     return PM3_SUCCESS;
 }
 
+int CmdHFMFNDEFWrite(const char *Cmd) {
+
+    CLIParserContext *ctx;
+    CLIParserInit(&ctx, "hf mf ndefwrite",
+                  "Write raw NDEF hex bytes to tag. This commands assumes tag already been NFC/NDEF formatted.\n",
+                  "hf mf ndefwrite -d 0300FE      -> write empty record to tag\n"
+                  "hf mf ndefwrite -f myfilename\n"
+                  "hf mf ndefwrite -d 033fd1023a53709101195405656e2d55534963656d616e2054776974746572206c696e6b5101195502747769747465722e636f6d2f686572726d616e6e31303031\n"
+                 );
+
+    void *argtable[] = {
+        arg_param_begin,
+        arg_str0("d", NULL, "<hex>", "raw NDEF hex bytes"),
+        arg_str0("f", "file", "<fn>", "write raw NDEF file to tag"),
+        arg_lit0("p", NULL, "fix NDEF record headers / terminator block if missing"),
+        arg_lit0(NULL, "mini", "MIFARE Classic Mini / S20"),
+        arg_lit0(NULL, "1k", "MIFARE Classic 1k / S50 (def)"),
+        arg_lit0(NULL, "2k", "MIFARE Classic/Plus 2k"),
+        arg_lit0(NULL, "4k", "MIFARE Classic 4k / S70"),
+        arg_lit0("v", "verbose", "verbose output"),
+        arg_param_end
+    };
+    CLIExecWithReturn(ctx, Cmd, argtable, false);
+
+    uint8_t raw[4096] = {0};
+    int rawlen;
+    CLIGetHexWithReturn(ctx, 1, raw, &rawlen);
+
+    int fnlen = 0;
+    char filename[FILE_PATH_SIZE] = {0};
+    CLIParamStrToBuf(arg_get_str(ctx, 2), (uint8_t *)filename, FILE_PATH_SIZE, &fnlen);
+
+    bool fix_msg = arg_get_lit(ctx, 3);
+
+    bool m0 = arg_get_lit(ctx, 4);
+    bool m1 = arg_get_lit(ctx, 5);
+    bool m2 = arg_get_lit(ctx, 6);
+    bool m4 = arg_get_lit(ctx, 7);
+    bool verbose = arg_get_lit(ctx, 8);
+
+    CLIParserFree(ctx);
+
+    // validations
+    if ((m0 + m1 + m2 + m4) > 1) {
+        PrintAndLogEx(WARNING, "Only specify one MIFARE Type");
+        return PM3_EINVARG;
+    } else if ((m0 + m1 + m2 + m4) == 0) {
+        m1 = true;
+    }
+
+    uint8_t numSectors = MIFARE_1K_MAXSECTOR;
+
+    if (m0) {
+        numSectors = MIFARE_MINI_MAXSECTOR;
+    } else if (m1) {
+        numSectors = MIFARE_1K_MAXSECTOR;
+    } else if (m2) {
+        numSectors = MIFARE_2K_MAXSECTOR;
+    } else if (m4) {
+        numSectors = MIFARE_4K_MAXSECTOR;
+    } else {
+        PrintAndLogEx(WARNING, "Please specify a MIFARE Type");
+        return PM3_EINVARG;
+    }
+
+    if (verbose) {
+        PrintAndLogEx(INFO, "Number of sectors selected: %u", numSectors);
+    }
+
+    if (g_session.pm3_present == false) {
+        PrintAndLogEx(FAILED, "No Proxmark3 device present");
+        return PM3_ENOTTY;
+    }
+
+    if ((rawlen && fnlen) || (rawlen == 0 && fnlen == 0)) {
+        PrintAndLogEx(WARNING, "Please specify either raw hex or filename");
+        return PM3_EINVARG;
+    }
+
+    // test if MAD key is used
+    uint64_t key64 = 0;
+
+    // check if we can authenticate to sector
+    int res = mfCheckKeys(0, MF_KEY_A, true, 1, (uint8_t *)g_mifare_mad_key, &key64);
+    if (res != PM3_SUCCESS) {
+        PrintAndLogEx(FAILED, "Sector 0 failed to authenticate with MAD default key");
+        PrintAndLogEx(HINT, "Verify that the tag NDEF formatted");
+        return res;
+    }
+
+    // NDEF for MIFARE CLASSIC has different memory size available.
+
+    int32_t bytes = rawlen;
+
+    // read dump file
+    if (fnlen) {
+        uint8_t *dump = NULL;
+        size_t bytes_read = 0;
+        res = pm3_load_dump(filename, (void **)&dump, &bytes_read, sizeof(raw));
+        if (res != PM3_SUCCESS) {
+            return res;
+        }
+        memcpy(raw, dump, bytes_read);
+        bytes = bytes_read;
+        free(dump);
+    }
+
+    // Has raw bytes ndef message header?bytes
+    switch (raw[0]) {
+        case 0x00:
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0xFD:
+        case 0xFE:
+            break;
+        default: {
+            if (fix_msg == false) {
+                PrintAndLogEx(WARNING, "raw NDEF message doesn't have a proper header,  continuing...");
+            } else {
+                if (bytes + 2 > sizeof(raw)) {
+                    PrintAndLogEx(WARNING, "no room for header, exiting...");
+                    return PM3_EMALLOC;
+                }
+                uint8_t tmp_raw[4096];
+                memcpy(tmp_raw, raw, sizeof(tmp_raw));
+                raw[0] = 0x03;
+                raw[1] = bytes;
+                memcpy(raw + 2, tmp_raw, sizeof(raw) - 2);
+                bytes += 2;
+                PrintAndLogEx(SUCCESS, "Added generic message header (0x03)");
+            }
+        }
+    }
+
+    // Has raw bytes ndef a terminator block?
+    if (raw[bytes - 1] != 0xFE) {
+        if (fix_msg == false) {
+            PrintAndLogEx(WARNING, "raw NDEF message doesn't have a terminator block,  continuing...");
+        } else {
+
+            if (bytes + 1 > sizeof(raw)) {
+                PrintAndLogEx(WARNING, "no room for terminator block, exiting...");
+                return PM3_EMALLOC;
+            }
+            raw[bytes] = 0xFE;
+            bytes++;
+            PrintAndLogEx(SUCCESS, "Added terminator block (0xFE)");
+        }
+    }
+
+    if (verbose) {
+        PrintAndLogEx(INFO, "Num of Bytes... %u", bytes);
+        print_buffer(raw, bytes, 0);
+    }
+
+    // read MAD Sector 0, block1,2
+    uint8_t sector0[MFBLOCK_SIZE * 4] = {0};
+    if (mfReadSector(MF_MAD1_SECTOR, MF_KEY_A, g_mifare_mad_key, sector0)) {
+        PrintAndLogEx(ERR, "error, read sector 0. card doesn't have MAD or doesn't have MAD on default keys");
+        PrintAndLogEx(HINT, "Try " _YELLOW_("`hf mf ndefread -k `") " with your custom key");
+        return PM3_ESOFT;
+    }
+
+    // decode MAD
+    uint16_t mad[7 + 8 + 8 + 8 + 8] = {0};
+    size_t madlen = 0;
+    res = MADDecode(sector0, NULL, mad, &madlen, false);
+    if (res != PM3_SUCCESS) {
+        PrintAndLogEx(ERR, "can't decode MAD");
+        return res;
+    }
+
+    // how much memory do I have available ?
+    // Skip sector 0 since its used for MAD
+    uint8_t freemem[MIFARE_4K_MAXSECTOR] = {0};
+    uint16_t sum = 0;
+    uint8_t block_no = 0;
+    for (uint8_t i = 1; i < madlen; i++) {
+
+        freemem[i] = (mad[i] == NDEF_MFC_AID);
+
+        if (freemem[i]) {
+
+            if (block_no == 0) {
+                block_no = mfFirstBlockOfSector(i);
+            }
+
+            if (verbose) {
+                PrintAndLogEx(INFO, "Sector %u is NDEF formatted", i);
+            }
+            sum += (MFBLOCK_SIZE * 3);
+        }
+    }
+
+    if (verbose) {
+        PrintAndLogEx(INFO, "Total avail ndef mem... %u", sum);
+        PrintAndLogEx(INFO, "First block............ %u", block_no);
+    }
+
+    if (sum < bytes) {
+        PrintAndLogEx(WARNING, "Raw NDEF message is larger than available NDEF formatted memory");
+        return PM3_EINVARG;
+    }
+
+    // main loop - write blocks
+    uint8_t *ptr_raw = raw;
+    while (bytes > 0) {
+
+        uint8_t block[MFBLOCK_SIZE] = { 0x00 };
+
+        if (bytes < MFBLOCK_SIZE) {
+            memcpy(block, ptr_raw, bytes);
+        } else {
+            memcpy(block, ptr_raw, MFBLOCK_SIZE);
+            ptr_raw += MFBLOCK_SIZE;
+        }
+
+        // write to card,  try B key first
+        if (mf_write_block(g_mifare_default_key, MF_KEY_B, block_no, block) == 0) {
+
+            // try A key,
+            if (mf_write_block(g_mifare_ndef_key, MF_KEY_A, block_no, block) == 0) {
+                return PM3_EFAILED;
+            }
+        }
+
+        PrintAndLogEx(INPLACE, "%u", block_no);
+
+        // find next available block
+        block_no++;
+        if (mfIsSectorTrailer(block_no)) {
+            block_no++;
+
+            // skip sectors which isn't ndef formatted
+            while (freemem[mfSectorNum(block_no)] == 0) {
+                block_no++;
+            }
+        }
+
+        bytes -= MFBLOCK_SIZE;
+    }
+
+    PrintAndLogEx(NORMAL, "");
+    return PM3_SUCCESS;
+}
 
 static int CmdHFMFPersonalize(const char *Cmd) {
     CLIParserContext *ctx;
@@ -6832,7 +7126,8 @@ static command_t CommandTable[] = {
     {"-----------", CmdHelp,                IfPm3Iso14443a,  "----------------------- " _CYAN_("ndef") " -----------------------"},
 //    {"ice",         CmdHF14AMfice,          IfPm3Iso14443a,  "collect MIFARE Classic nonces to file"},
     {"ndefformat",  CmdHFMFNDEFFormat,      IfPm3Iso14443a,  "Format MIFARE Classic Tag as NFC Tag"},
-    {"ndefread",    CmdHFMFNDEFRead,        IfPm3Iso14443a,  "Prints NDEF records from card"},
+    {"ndefread",    CmdHFMFNDEFRead,        IfPm3Iso14443a,  "Read and print NDEF records from card"},
+    {"ndefwrite",   CmdHFMFNDEFWrite,       IfPm3Iso14443a,  "Write NDEF records to card"},
     {NULL, NULL, NULL, NULL}
 
 };

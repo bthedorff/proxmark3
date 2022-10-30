@@ -177,18 +177,20 @@ Check column "offline" for their availability.
 |-------                  |------- |-----------
 |`hf 14a help            `|Y       |`This help`
 |`hf 14a list            `|Y       |`List ISO 14443-a history`
-|`hf 14a info            `|N       |`Tag information`
-|`hf 14a reader          `|N       |`Act like an ISO14443-a reader`
-|`hf 14a ndefread        `|N       |`Read an NDEF file from ISO 14443-A Type 4 tag`
-|`hf 14a cuids           `|N       |`Collect n>0 ISO14443-a UIDs in one go`
-|`hf 14a sim             `|N       |`Simulate ISO 14443-a tag`
-|`hf 14a sniff           `|N       |`sniff ISO 14443-a traffic`
-|`hf 14a apdu            `|N       |`Send ISO 14443-4 APDU to tag`
-|`hf 14a chaining        `|N       |`Control ISO 14443-4 input chaining`
-|`hf 14a raw             `|N       |`Send raw hex data to tag`
 |`hf 14a antifuzz        `|N       |`Fuzzing the anticollision phase.  Warning! Readers may react strange`
 |`hf 14a config          `|N       |`Configure 14a settings (use with caution)`
+|`hf 14a cuids           `|N       |`Collect n>0 ISO14443-a UIDs in one go`
+|`hf 14a info            `|N       |`Tag information`
+|`hf 14a sim             `|N       |`Simulate ISO 14443-a tag`
+|`hf 14a sniff           `|N       |`sniff ISO 14443-a traffic`
+|`hf 14a raw             `|N       |`Send raw hex data to tag`
+|`hf 14a reader          `|N       |`Act like an ISO14443-a reader`
+|`hf 14a apdu            `|N       |`Send ISO 14443-4 APDU to tag`
 |`hf 14a apdufind        `|N       |`Enumerate APDUs - CLA/INS/P1P2`
+|`hf 14a chaining        `|N       |`Control ISO 14443-4 input chaining`
+|`hf 14a ndefformat      `|N       |`Format ISO 14443-A as NFC Type 4 tag`
+|`hf 14a ndefread        `|N       |`Read an NDEF file from ISO 14443-A Type 4 tag`
+|`hf 14a ndefwrite       `|N       |`Write NDEF records to ISO 14443-A tag`
 
 
 ### hf 14b
@@ -273,7 +275,8 @@ Check column "offline" for their availability.
 |-------                  |------- |-----------
 |`hf epa help            `|Y       |`This help`
 |`hf epa cnonces         `|N       |`Acquire encrypted PACE nonces of specific size`
-|`hf epa preplay         `|N       |`Perform PACE protocol by replaying given APDUs`
+|`hf epa replay          `|N       |`Perform PACE protocol by replaying given APDUs`
+|`hf epa sim             `|N       |`Simulate PACE protocol`
 
 
 ### hf emrtd
@@ -509,7 +512,8 @@ Check column "offline" for their availability.
 |`hf mf gen3freeze       `|N       |`Perma lock UID changes. irreversible`
 |`hf mf gview            `|N       |`View card`
 |`hf mf ndefformat       `|N       |`Format MIFARE Classic Tag as NFC Tag`
-|`hf mf ndefread         `|N       |`Prints NDEF records from card`
+|`hf mf ndefread         `|N       |`Read and print NDEF records from card`
+|`hf mf ndefwrite        `|N       |`Write NDEF records to card`
 
 
 ### hf mfp
@@ -967,6 +971,7 @@ Check column "offline" for their availability.
 |command                  |offline |description
 |-------                  |------- |-----------
 |`lf indala help         `|Y       |`This help`
+|`lf indala brute        `|N       |`Demodulate an Indala tag (PSK1) from the GraphBuffer`
 |`lf indala demod        `|Y       |`Demodulate an Indala tag (PSK1) from the GraphBuffer`
 |`lf indala altdemod     `|Y       |`Alternative method to demodulate samples for Indala 64 bit UID (option '224' for 224 bit)`
 |`lf indala reader       `|N       |`Read an Indala tag from the antenna`
@@ -1283,7 +1288,9 @@ Check column "offline" for their availability.
 
 |command                  |offline |description
 |-------                  |------- |-----------
+|`nfc type4a format      `|N       |`format ISO-14443-a tag as NFC Tag`
 |`nfc type4a read        `|N       |`read NFC Forum Tag Type 4 A`
+|`nfc type4a write       `|N       |`write NFC Forum Tag Type 4 A`
 |`nfc type4a st25taread  `|N       |`read ST25TA as NFC Forum Tag Type 4`
 |`nfc type4a help        `|Y       |`This help`
 
@@ -1304,8 +1311,9 @@ Check column "offline" for their availability.
 
 |command                  |offline |description
 |-------                  |------- |-----------
-|`nfc mf cread           `|N       |`read NFC Type MIFARE Classic Tag`
 |`nfc mf cformat         `|N       |`format MIFARE Classic Tag as NFC Tag`
+|`nfc mf cread           `|N       |`read NFC Type MIFARE Classic Tag`
+|`nfc mf cwrite          `|N       |`write NFC Type MIFARE Classic Tag`
 |`nfc mf pread           `|N       |`read NFC Type MIFARE Plus Tag`
 |`nfc mf help            `|Y       |`This help`
 

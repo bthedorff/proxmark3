@@ -588,7 +588,7 @@ int rdv40_spiffs_read_as_filetype(char *filename, uint8_t *dst, uint32_t size, R
         case RDV40_SPIFFS_FILETYPE_BOTH:
         case RDV40_SPIFFS_FILETYPE_UNKNOWN:
         default:
-            ;
+            break;
     }
     )
 }

@@ -662,17 +662,18 @@ static int CmdHF14ACUIDs(const char *Cmd) {
 int CmdHF14ASim(const char *Cmd) {
     CLIParserContext *ctx;
     CLIParserInit(&ctx, "hf 14a sim",
-                  "Simulate ISO/IEC 14443 type A tag with 4,7 or 10 byte UID",
-                  "hf 14a sim -t 1 --uid 11223344      -> MIFARE Classic 1k\n"
-                  "hf 14a sim -t 2                     -> MIFARE Ultralight\n"
-                  "hf 14a sim -t 3                     -> MIFARE Desfire\n"
-                  "hf 14a sim -t 4                     -> ISO/IEC 14443-4\n"
-                  "hf 14a sim -t 5                     -> MIFARE Tnp3xxx\n"
-                  "hf 14a sim -t 6                     -> MIFARE Mini\n"
-                  "hf 14a sim -t 7                     -> Amiibo (NTAG 215),  pack 0x8080\n"
-                  "hf 14a sim -t 8                     -> MIFARE Classic 4k\n"
-                  "hf 14a sim -t 9                     -> FM11RF005SH Shanghai Metro\n"
-                  "hf 14a sim -t 10                    -> ST25TA IKEA Rothult\n");
+                  "Simulate ISO/IEC 14443 type A tag with 4,7 or 10 byte UID\n"
+                  "Use type 7 for Mifare Ultralight EV1, Amiibo (NTAG215 pack 0x8080)",
+                  "hf 14a sim -t 1 --uid 11223344  -> MIFARE Classic 1k\n"
+                  "hf 14a sim -t 2                 -> MIFARE Ultralight\n"
+                  "hf 14a sim -t 3                 -> MIFARE Desfire\n"
+                  "hf 14a sim -t 4                 -> ISO/IEC 14443-4\n"
+                  "hf 14a sim -t 5                 -> MIFARE Tnp3xxx\n"
+                  "hf 14a sim -t 6                 -> MIFARE Mini\n"
+                  "hf 14a sim -t 7                 -> MFU EV1 / NTAG 215 Amiibo\n"
+                  "hf 14a sim -t 8                 -> MIFARE Classic 4k\n"
+                  "hf 14a sim -t 9                 -> FM11RF005SH Shanghai Metro\n"
+                  "hf 14a sim -t 10                -> ST25TA IKEA Rothult\n");
 
     void *argtable[] = {
         arg_param_begin,
@@ -686,7 +687,7 @@ int CmdHF14ASim(const char *Cmd) {
     };
     CLIExecWithReturn(ctx, Cmd, argtable, false);
 
-    int tagtype = arg_get_int(ctx, 1);
+    int tagtype = arg_get_int_def(ctx, 1, 1);
 
     int uid_len = 0;
     uint8_t uid[10] = {0};
@@ -715,7 +716,7 @@ int CmdHF14ASim(const char *Cmd) {
         useUIDfromEML = false;
     }
 
-    uint8_t exitAfterNReads = arg_get_int(ctx, 3);
+    uint8_t exitAfterNReads = arg_get_int_def(ctx, 3, 0);
 
     if (arg_get_lit(ctx, 4)) {
         flags |= FLAG_NR_AR_ATTACK;
@@ -725,6 +726,11 @@ int CmdHF14ASim(const char *Cmd) {
     bool verbose = arg_get_lit(ctx, 6);
 
     CLIParserFree(ctx);
+
+    if (tagtype > 10) {
+        PrintAndLogEx(ERR, "Undefined tag %d", tagtype);
+        return PM3_EINVARG;
+    }
 
     sector_t *k_sector = NULL;
     uint8_t k_sectorsCount = 40;
@@ -751,7 +757,7 @@ int CmdHF14ASim(const char *Cmd) {
 
     PrintAndLogEx(INFO, "Press pm3-button to abort simulation");
     bool keypress = kbd_enter_pressed();
-    while (!keypress) {
+    while (keypress == false) {
 
         if (WaitForResponseTimeout(CMD_HF_MIFARE_SIMULATE, &resp, 1500) == 0) continue;
         if (resp.status != PM3_SUCCESS) break;
@@ -2318,7 +2324,7 @@ int infoHF14A(bool verbose, bool do_nack_test, bool do_aid_search) {
         }
 
         uint8_t signature[32] = {0};
-        res = detect_mfc_ev1_signature(signature);
+        res = read_mfc_ev1_signature(signature);
         if (res == PM3_SUCCESS) {
             mfc_ev1_print_signature(card.uid, card.uidlen, signature, sizeof(signature));
         }

@@ -35,6 +35,8 @@
 #include "util_posix.h"         // msclock
 #include "cmdparser.h"          // detection of flash capabilities
 #include "cmdflashmemspiffs.h"  // upload to flash mem
+#include "mifaredefault.h"      // default keys
+
 
 int mfDarkside(uint8_t blockno, uint8_t key_type, uint64_t *key) {
     uint32_t uid = 0;
@@ -80,7 +82,7 @@ int mfDarkside(uint8_t blockno, uint8_t key_type, uint64_t *key) {
             PacketResponseNG resp;
             if (WaitForResponseTimeout(CMD_HF_MIFARE_READER, &resp, 2000)) {
                 if (resp.status == PM3_EOPABORTED) {
-                    return -1;
+                    return resp.status;
                 }
 
                 struct p {
@@ -435,7 +437,7 @@ int mfnested(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t trgBlockNo,
     clearCommandBuffer();
     SendCommandNG(CMD_HF_MIFARE_NESTED, (uint8_t *)&payload, sizeof(payload));
 
-    if (!WaitForResponseTimeout(CMD_HF_MIFARE_NESTED, &resp, 2000)) {
+    if (WaitForResponseTimeout(CMD_HF_MIFARE_NESTED, &resp, 2000) == false) {
         SendCommandNG(CMD_BREAK_LOOP, NULL, 0);
         return PM3_ETIMEOUT;
     }
@@ -880,7 +882,7 @@ int mfReadSector(uint8_t sectorNo, uint8_t keyType, const uint8_t *key, uint8_t 
     return PM3_SUCCESS;
 }
 
-int mfReadBlock(uint8_t blockNo, uint8_t keyType, uint8_t *key, uint8_t *data) {
+int mfReadBlock(uint8_t blockNo, uint8_t keyType, const uint8_t *key, uint8_t *data) {
     mf_readblock_t payload = {
         .blockno = blockNo,
         .keytype = keyType
@@ -1158,13 +1160,15 @@ int mfGen3Freeze(void) {
     }
 }
 
-int mfG4GetBlock(uint8_t *pwd, uint8_t blockno, uint8_t *data) {
+int mfG4GetBlock(uint8_t *pwd, uint8_t blockno, uint8_t *data, uint8_t workFlags) {
     struct p {
         uint8_t blockno;
         uint8_t pwd[4];
+        uint8_t workFlags;
     } PACKED payload;
     payload.blockno = blockno;
     memcpy(payload.pwd, pwd, sizeof(payload.pwd));
+    payload.workFlags = workFlags;
 
     clearCommandBuffer();
     SendCommandNG(CMD_HF_MIFARE_G4_RDBL, (uint8_t *)&payload, sizeof(payload));
@@ -1181,6 +1185,31 @@ int mfG4GetBlock(uint8_t *pwd, uint8_t blockno, uint8_t *data) {
     return PM3_SUCCESS;
 }
 
+int mfG4SetBlock(uint8_t *pwd, uint8_t blockno, uint8_t *data, uint8_t workFlags) {
+    struct p {
+        uint8_t blockno;
+        uint8_t pwd[4];
+        uint8_t data[16];
+        uint8_t workFlags;
+    } PACKED payload;
+    payload.blockno = blockno;
+    memcpy(payload.pwd, pwd, sizeof(payload.pwd));
+    memcpy(payload.data, data, sizeof(payload.data));
+    payload.workFlags = workFlags;
+
+    clearCommandBuffer();
+    SendCommandNG(CMD_HF_MIFARE_G4_WRBL, (uint8_t *)&payload, sizeof(payload));
+    PacketResponseNG resp;
+    if (WaitForResponseTimeout(CMD_HF_MIFARE_G4_WRBL, &resp, 1500)) {
+        if (resp.status != PM3_SUCCESS) {
+            return PM3_EUNDEF;
+        }
+    } else {
+        PrintAndLogEx(WARNING, "command execute timeout");
+        return PM3_ETIMEOUT;
+    }
+    return PM3_SUCCESS;
+}
 
 // variables
 uint32_t cuid = 0;    // uid part used for crypto1.
@@ -1270,6 +1299,8 @@ int detect_classic_nackbug(bool verbose) {
 
     if (verbose)
         PrintAndLogEx(SUCCESS, "press pm3-button on the Proxmark3 device to abort both Proxmark3 and client.\n");
+
+    PrintAndLogEx(INFO, "." NOLF);
 
     while (true) {
 
@@ -1392,15 +1423,20 @@ int detect_mf_magic(bool is_mfc) {
     return isGeneration;
 }
 
-int detect_mfc_ev1_signature(uint8_t *signature) {
+bool detect_mfc_ev1_signature(void) {
+    uint64_t key = 0;
+    int res = mfCheckKeys(69, MF_KEY_B, false, 1, (uint8_t *)g_mifare_signature_key_b, &key);
+    return (res == PM3_SUCCESS);
+}
+
+int read_mfc_ev1_signature(uint8_t *signature) {
     if (signature == NULL) {
         return PM3_EINVARG;
     }
     uint8_t sign[32] = {0};
-    uint8_t key[] = {0x4b, 0x79, 0x1b, 0xea, 0x7b, 0xcc};
-    int res = mfReadBlock(69, 1, key, sign);
+    int res = mfReadBlock(69, MF_KEY_B, g_mifare_signature_key_b, sign);
     if (res == PM3_SUCCESS) {
-        res = mfReadBlock(70, 1, key, sign + 16);
+        res = mfReadBlock(70, MF_KEY_B, g_mifare_signature_key_b, sign + 16);
         if (res ==  PM3_SUCCESS) {
             memcpy(signature, sign, sizeof(sign));
         }

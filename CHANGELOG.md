@@ -3,6 +3,17 @@ All notable changes to this project will be documented in this file.
 This project uses the changelog in accordance with [keepchangelog](http://keepachangelog.com/). Please use this to write notable changes, which is not the same as git commit log...
 
 ## [unreleased][unreleased]
+ - Added luascript `hf_i2c_plus_2k_utils` - Script for dumping/modifying user memory of sectors 0 and 1 (@flamebarke) 
+ - Added `hf mfu esave` - saves emulator memory to mfu dump file (@DidierA)
+ - Added luascript `hf_mfu_ntag` - Script for configuring NTAG216 configuration pages (@flamebarke)
+ - Changed `hf mf hardnested` - a detection for static encrypted nonces (@iceman1001)
+ - Added requirements.txt file to tools folder. Minimum to run pm3_tests.sh (@iceman1001)
+ - Changed `hf mf hardnested` - now can detect and use MFC EV1 signature sector key (@iceman1001)
+ - Changed `hf mf autopwn` - now can detect and use MFC EV1 signature sector key (@iceman1001)
+ - Fixed `pm3` shell script now automatically detects WSL2 with USBIPD serial ports (@iceman1001)
+ - Fixed `trace list -c` - annotation of CRC bytes now is colored or squared if no ansi colors is supported (@iceman1001)
+ - Fixed `trace list -t mf` - now also finds UID if anticollision is partial captured, to be used for mfkey (@iceman1001)
+ - Added `hf mf gload, gsave, ggetblk, gsetblk` for Gen4 GTU in mifare classic mode (@DidierA)
 
 ## [Radium.4.15864][2022-10-29]
  - Changed `lf indala sim` - now accepts fc / cn (@iceman1001)
